@@ -11,14 +11,14 @@ jQuery(document).ready(function($) {
     // We only initialize SelectWoo for the customer search, which uses AJAX.
     $debugUserSelect.selectWoo({
         ajax: {
-            url: kissWooCouponDebugger.ajax_url,
+            url: wcSCDebugger.ajax_url,
             dataType: 'json',
             delay: 250,
             data: function (params) {
                 return {
                     term: params.term, // search term
                     action: 'woocommerce_json_search_customers',
-                    security: kissWooCouponDebugger.search_customers_nonce
+                    security: wcSCDebugger.search_customers_nonce
                 };
             },
             processResults: function (data) {
@@ -55,11 +55,11 @@ jQuery(document).ready(function($) {
         $runDebugButton.prop('disabled', true);
 
         $.ajax({
-            url: kissWooCouponDebugger.ajax_url,
+            url: wcSCDebugger.ajax_url,
             type: 'POST',
             data: {
-                action: 'kiss_woo_debug_coupon',
-                security: kissWooCouponDebugger.debug_coupon_nonce,
+                action: 'wc_sc_debug_coupon',
+                security: wcSCDebugger.debug_coupon_nonce,
                 coupon_code: couponCode,
                 product_id: productId,
                 user_id: userId
