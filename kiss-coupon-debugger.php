@@ -2,16 +2,33 @@
 /**
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
- * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.2.0
+ * Description: A companion plugin for WooCommerce Coupons to debug coupon application and hook/filter processing.
+ * Version:     1.2.6
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
- * License:     GPL-3.0+
- * License URI: http://www.gnu.org/licenses/gpl-3.0.html
+ * License:     GPL-2.0
  * Text Domain: wc-sc-debugger
  * Domain Path: /languages
  *
  * Changelog
+ *
+ * #### 1.2.6 - 2025-08-03
+ * - Tweak: Added deep logging for `woocommerce_add_to_cart_validation` filter and any generated WC notices to better capture plugin conflicts.
+ *
+ * #### 1.2.5 - 2025-08-03
+ * - Feature: Added an environment versions panel to the top of the debugger page.
+ *
+ * #### 1.2.4 - 2025-08-03
+ * - Feature: Added the plugin version number to admin page titles.
+ *
+ * #### 1.2.3 - 2025-08-03
+ * - Tweak: Added explicit logging for the success or failure of the `add_to_cart` function.
+ *
+ * #### 1.2.2 - 2025-08-03
+ * - Tweak: Added deep logging for cart contents and product prices to debug zero-total issue.
+ *
+ * #### 1.2.1 - 2025-08-03
+ * - Tweak: Added more detailed logging during coupon test to show pre-coupon total, coupon details, and discount amount.
  *
  * #### 1.2.0 - 2025-08-03
  * - Fix: PHP fatal error by ensuring WC notices are correctly handled during the test simulation.
@@ -37,6 +54,13 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @var WC_SC_Debugger|null
 		 */
 		private static $instance = null;
+
+		/**
+		 * The plugin version number.
+		 *
+		 * @var string
+		 */
+		const VERSION = '1.2.6';
 
 		/**
 		 * Array to store debugging messages.
@@ -223,7 +247,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.2.0', // Updated version.
+				self::VERSION,
 				true
 			);
 
@@ -241,7 +265,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
-				'1.0.0'
+				self::VERSION
 			);
 		}
 
@@ -249,10 +273,24 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * Render the main debugger admin page content.
 		 */
 		public function render_admin_page() {
+			global $wpdb;
 			$validated_products = get_option( 'wc_sc_debugger_validated_products', array() );
+			$current_theme = wp_get_theme();
 			?>
 			<div class="wrap woocommerce">
-				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger', 'wc-sc-debugger' ); ?></h1>
+				<h1><?php echo esc_html__( 'KISS Woo Coupon Debugger', 'wc-sc-debugger' ); ?> <span class="wc-sc-debugger-version">v<?php echo esc_html( self::VERSION ); ?></span></h1>
+
+				<div class="wc-sc-debugger-env-info">
+					<h2 class="wc-sc-debugger-env-title"><?php esc_html_e( 'Environment Versions', 'wc-sc-debugger' ); ?></h2>
+					<ul>
+						<li><strong><?php esc_html_e( 'WordPress:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( get_bloginfo( 'version' ) ); ?></li>
+						<li><strong><?php esc_html_e( 'PHP:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( phpversion() ); ?></li>
+						<li><strong><?php esc_html_e( 'MySQL:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( $wpdb->get_var( 'SELECT VERSION()' ) ); ?></li>
+						<li><strong><?php esc_html_e( 'WooCommerce:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( WC()->version ); ?></li>
+						<li><strong><?php echo esc_html( $current_theme->get( 'Name' ) ); ?>:</strong> <?php echo esc_html( $current_theme->get( 'Version' ) ); ?></li>
+						<li><strong><?php esc_html_e( 'Coupon Debugger:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( self::VERSION ); ?></li>
+					</ul>
+				</div>
 
 				<div class="wc-sc-debugger-container">
 					<div class="wc-sc-debugger-form">
@@ -278,7 +316,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 								}
 								?>
 							</select>
-							<p class="description"><?php esc_html_e( 'Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger' ); ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-sc-debugger-settings' ) ); ?>"><?php esc_html_e( 'SC Debugger Settings', 'wc-sc-debugger' ); ?></a> <?php esc_html_e( 'page.', 'wc-sc-debugger' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger' ); ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-sc-debugger-settings' ) ); ?>"><?php esc_html_e( 'Debugger Settings', 'wc-sc-debugger' ); ?></a> <?php esc_html_e( 'page.', 'wc-sc-debugger' ); ?></p>
 						</div>
 
 						<div class="form-field">
@@ -311,7 +349,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		public function render_settings_page() {
 			?>
 			<div class="wrap woocommerce">
-				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger Settings', 'wc-sc-debugger' ); ?></h1>
+				<h1><?php echo esc_html__( 'KISS Woo Coupon Debugger Settings', 'wc-sc-debugger' ); ?> <span class="wc-sc-debugger-version">v<?php echo esc_html( self::VERSION ); ?></span></h1>
 				<form method="post" action="options.php">
 					<?php
 					settings_fields( 'wc_sc_debugger_options_group' );
@@ -641,23 +679,58 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				self::log_message( 'info', __( 'Simulating guest user.', 'wc-sc-debugger' ) );
 			}
 
+			// Temporarily add deep validation hooks to trace add_to_cart issues.
+			add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'track_filter' ), 9999, 6 );
+
 			// Add products to the cart.
 			if ( ! empty( $product_ids ) ) {
 				foreach ( $product_ids as $product_id ) {
 					$product = wc_get_product( $product_id );
 					if ( $product && $product->is_purchasable() ) {
-						WC()->cart->add_to_cart( $product_id, 1 );
-						self::log_message( 'info', sprintf( __( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						$add_to_cart_result = WC()->cart->add_to_cart( $product_id, 1 );
+
+						$generated_notices = wc_get_notices();
+						if ( ! empty( $generated_notices ) ) {
+							self::log_message( 'warning', __( 'Notices were generated during add_to_cart() call.', 'wc-sc-debugger' ), array( 'args' => $generated_notices ) );
+							wc_clear_notices(); // Clear them after logging so they don't persist.
+						}
+
+						if ( false !== $add_to_cart_result ) {
+							self::log_message( 'success', sprintf( __( 'Successfully added product to cart: %s (ID: %d).', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						} else {
+							self::log_message( 'error', sprintf( __( 'Failed to add product to cart: %s (ID: %d). add_to_cart() returned false.', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						}
 					} else {
-						self::log_message( 'warning', sprintf( __( 'Could not add product ID %d to cart (might not be purchasable or found).', 'wc-sc-debugger' ), $product_id ) );
+						$reason = __( 'is not purchasable or could not be found', 'wc-sc-debugger' );
+						if ( ! $product ) {
+							$reason = __( 'could not be found', 'wc-sc-debugger' );
+						} elseif ( ! $product->is_purchasable() ) {
+							$reason = __( 'is not purchasable (e.g., no price, out of stock)', 'wc-sc-debugger' );
+						}
+						self::log_message( 'warning', sprintf( __( 'Could not add product ID %d to cart because it %s.', 'wc-sc-debugger' ), $product_id, $reason ) );
 					}
 				}
 			}
+
+			// Remove the temporary hooks after the loop.
+			remove_filter( 'woocommerce_add_to_cart_validation', array( $this, 'track_filter' ), 9999 );
 
 			// If cart is still empty, add a dummy product.
 			if ( WC()->cart->is_empty() ) {
 				$dummy_product_id = $this->get_or_create_dummy_product();
 				if ( $dummy_product_id ) {
+					$dummy_product = wc_get_product( $dummy_product_id );
+					if ( $dummy_product ) {
+						self::log_message(
+							'info',
+							sprintf(
+								'Dummy product details: Price=%s, Type=%s, Status=%s',
+								$dummy_product->get_price(),
+								$dummy_product->get_type(),
+								$dummy_product->get_status()
+							)
+						);
+					}
 					WC()->cart->add_to_cart( $dummy_product_id, 1 );
 					self::log_message( 'info', sprintf( __( 'Cart was empty, added dummy product (ID: %d) for testing general coupons.', 'wc-sc-debugger' ), $dummy_product_id ) );
 				} else {
@@ -667,6 +740,46 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			}
 
 			WC()->cart->calculate_totals();
+
+			$cart_contents_for_log = array();
+			foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {
+				$product_in_cart = $cart_item['data'];
+				$cart_contents_for_log[ $cart_item_key ] = array(
+					'product_name'                => $product_in_cart->get_name(),
+					'product_id'                  => $product_in_cart->get_id(),
+					'quantity'                    => $cart_item['quantity'],
+					'price_from_product_object'   => $product_in_cart->get_price(),
+					'line_subtotal'               => $cart_item['line_subtotal'],
+					'line_total'                  => $cart_item['line_total'],
+				);
+			}
+			self::log_message( 'info', 'Cart Contents Details (Before Coupon)', array( 'args' => $cart_contents_for_log ) );
+
+			$original_cart_total = WC()->cart->get_total( 'edit' );
+			self::log_message( 'info', sprintf( __( 'Cart Total before applying coupon: %s', 'wc-sc-debugger' ), wc_price( $original_cart_total ) ) );
+
+			$coupon = new WC_Coupon( $coupon_code );
+			if ( $coupon->get_id() ) {
+				self::log_message(
+					'info',
+					sprintf( __( 'Details for coupon "%s"', 'wc-sc-debugger' ), $coupon_code ),
+					array(
+						'args' => $this->sanitize_for_logging(
+							array(
+								'type'                 => $coupon->get_discount_type(),
+								'amount'               => $coupon->get_amount(),
+								'individual_use'       => $coupon->get_individual_use( 'view' ),
+								'product_ids'          => $coupon->get_product_ids( 'view' ),
+								'excluded_product_ids' => $coupon->get_excluded_product_ids( 'view' ),
+								'usage_limit'          => $coupon->get_usage_limit( 'view' ),
+								'expiry_date'          => $coupon->get_date_expires( 'view' ) ? $coupon->get_date_expires( 'view' )->format( 'Y-m-d' ) : __( 'No expiry date', 'wc-sc-debugger' ),
+							)
+						),
+					)
+				);
+			} else {
+				self::log_message( 'warning', sprintf( __( 'Could not load coupon with code "%s". It may not exist.', 'wc-sc-debugger' ), $coupon_code ) );
+			}
 
 			self::log_message( 'info', sprintf( __( 'Attempting to apply coupon: "%s"', 'wc-sc-debugger' ), $coupon_code ) );
 
@@ -681,7 +794,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					self::log_message( 'error', __( 'Coupon could not be applied. Check coupon validity and restrictions.', 'wc-sc-debugger' ) );
 				} else {
 					WC()->cart->calculate_totals();
-					$cart_total = WC()->cart->get_total( 'edit' );
+					$cart_total     = WC()->cart->get_total( 'edit' );
+					$discount_total = WC()->cart->get_discount_total();
+
+					self::log_message( 'info', sprintf( __( 'Discount applied: %s', 'wc-sc-debugger' ), wc_price( $discount_total ) ) );
 					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'wc-sc-debugger' ), wc_price( $cart_total ) ) );
 				}
 			} catch ( Exception $e ) {
