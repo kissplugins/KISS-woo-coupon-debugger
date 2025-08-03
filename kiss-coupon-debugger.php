@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: WC Smart Coupons Debugger
- * Plugin URI:  https://example.com/
+ * Plugin Name: KISS Woo Coupon Debugger
+ * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
  * Version:     1.2.0
- * Author:      Your Name
- * Author URI:  https://example.com/
+ * Author:      KISS Plugins
+ * Author URI:  https://kissplugins.com
  * License:     GPL-3.0+
  * License URI: http://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: wc-sc-debugger
