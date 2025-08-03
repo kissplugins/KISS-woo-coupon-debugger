@@ -3,13 +3,19 @@
  * Plugin Name: WC Smart Coupons Debugger
  * Plugin URI:  https://example.com/
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      Your Name
  * Author URI:  https://example.com/
  * License:     GPL-3.0+
  * License URI: http://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: wc-sc-debugger
  * Domain Path: /languages
+ *
+ * Changelog
+ *
+ * #### 1.2.0 - 2025-08-03
+ * - Fix: PHP fatal error by ensuring WC notices are correctly handled during the test simulation.
+ * - Tweak: Improved session handling during the coupon test.
  *
  * @package WC_SC_Debugger
  */
@@ -217,7 +223,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.1.0', // Updated version.
+				'1.2.0', // Updated version.
 				true
 			);
 
@@ -608,16 +614,19 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 */
 		private function test_coupon( $coupon_code, $product_ids = array(), $user_id = 0 ) {
 			// Store original state.
-			$original_cart_contents = WC()->cart->get_cart_contents();
+			$original_cart_contents   = WC()->cart->get_cart_contents();
 			$original_applied_coupons = WC()->cart->get_applied_coupons();
-			$original_session_data = WC()->session ? WC()->session->get_session_data() : array();
-			$original_user_id = get_current_user_id();
+			$original_session_data    = WC()->session ? WC()->session->get_session_data() : array();
+			$original_user_id         = get_current_user_id();
+			// Explicitly back up notices to prevent state leakage and fatal errors.
+			$original_notices = WC()->session ? WC()->session->get( 'wc_notices', array() ) : array();
 
 			// Clear the current cart and session for a clean test.
 			WC()->cart->empty_cart( true );
 			if ( WC()->session ) {
-				WC()->session->set( 'cart', null );
-				WC()->session->set( 'applied_coupons', null );
+				// empty_cart() handles cart contents and applied coupons session data.
+				// We explicitly clear/reset other data points to ensure a clean slate for the test.
+				WC()->session->set( 'wc_notices', array() ); // FIX: Prevent fatal error by ensuring notices are a clean array.
 				WC()->session->set( 'sc_coupon_valid', null );
 				WC()->session->set( 'sc_coupon_error', null );
 				WC()->session->set( 'wc_sc_cart_smart_coupons', array() );
@@ -694,6 +703,9 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				foreach ( $original_session_data as $key => $value ) {
 					WC()->session->set( $key, $value );
 				}
+				// After restoring the session, make sure our backed-up notices are in place,
+				// as session restoration can sometimes be imperfect with complex data types.
+				WC()->session->set( 'wc_notices', $original_notices );
 			}
 
 			// Restore applied coupons.
