@@ -1,34 +1,34 @@
 <?php
 /**
- * Plugin Name: WC Smart Coupons Debugger
+ * Plugin Name: KISS woo coupon debugger
  * Plugin URI:  https://example.com/
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
  * Version:     1.1.0
  * Author:      Your Name
  * Author URI:  https://example.com/
- * License:     GPL-3.0+
- * License URI: http://www.gnu.org/licenses/gpl-3.0.html
- * Text Domain: wc-sc-debugger
+ * License:     GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: kiss-woo-coupon-debugger
  * Domain Path: /languages
  *
- * @package WC_SC_Debugger
+ * @package KISS_woo_coupon_debugger
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-if ( ! class_exists( 'WC_SC_Debugger' ) ) {
+if ( ! class_exists( 'KISS_woo_coupon_debugger' ) ) {
 
 	/**
 	 * Main class for the WC Smart Coupons Debugger plugin.
 	 */
-	class WC_SC_Debugger {
+	class KISS_woo_coupon_debugger {
 
 		/**
 		 * Singleton instance of the plugin.
 		 *
-		 * @var WC_SC_Debugger|null
+		 * @var KISS_woo_coupon_debugger|null
 		 */
 		private static $instance = null;
 
@@ -42,7 +42,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		/**
 		 * Get the singleton instance of the plugin.
 		 *
-		 * @return WC_SC_Debugger
+		 * @return KISS_woo_coupon_debugger
 		 */
 		public static function get_instance() {
 			if ( is_null( self::$instance ) ) {
@@ -59,7 +59,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 			add_action( 'admin_init', array( $this, 'register_settings' ) );
 			add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
-			add_action( 'wp_ajax_wc_sc_debug_coupon', array( $this, 'handle_debug_coupon_ajax' ) );
+			add_action( 'wp_ajax_kiss_woo_debug_coupon', array( $this, 'handle_debug_coupon_ajax' ) );
 		}
 
 		/**
@@ -68,10 +68,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		public function add_admin_menu_page() {
 			add_submenu_page(
 				'woocommerce',
-				__( 'SC Debugger', 'wc-sc-debugger' ),
-				__( 'SC Debugger', 'wc-sc-debugger' ),
+				__( 'SC Debugger', 'kiss-woo-coupon-debugger' ),
+				__( 'SC Debugger', 'kiss-woo-coupon-debugger' ),
 				'manage_woocommerce',
-				'wc-sc-debugger',
+				'kiss-woo-coupon-debugger',
 				array( $this, 'render_admin_page' )
 			);
 		}
@@ -82,10 +82,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		public function add_settings_page() {
 			add_submenu_page(
 				'woocommerce',
-				__( 'SC Debugger Settings', 'wc-sc-debugger' ),
-				__( 'SC Debugger Settings', 'wc-sc-debugger' ),
+				__( 'SC Debugger Settings', 'kiss-woo-coupon-debugger' ),
+				__( 'SC Debugger Settings', 'kiss-woo-coupon-debugger' ),
 				'manage_woocommerce',
-				'wc-sc-debugger-settings',
+				'kiss-woo-coupon-debugger-settings',
 				array( $this, 'render_settings_page' )
 			);
 		}
@@ -95,27 +95,27 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 */
 		public function register_settings() {
 			register_setting(
-				'wc_sc_debugger_options_group',
-				'wc_sc_debugger_validated_products',
+				'kiss_woo_coupon_debugger_options_group',
+				'kiss_woo_coupon_debugger_validated_products',
 				array( $this, 'sanitize_validated_products' )
 			);
 
 			add_settings_section(
-				'wc_sc_debugger_products_section',
-				__( 'Pre-define Products for Testing', 'wc-sc-debugger' ),
+				'kiss_woo_coupon_debugger_products_section',
+				__( 'Pre-define Products for Testing', 'kiss-woo-coupon-debugger' ),
 				array( $this, 'products_section_callback' ),
-				'wc-sc-debugger-settings'
+				'kiss-woo-coupon-debugger-settings'
 			);
 
 			for ( $i = 1; $i <= 3; $i++ ) {
 				add_settings_field(
-					'wc_sc_debugger_product_id_' . $i,
-					sprintf( __( 'Product ID %d', 'wc-sc-debugger' ), $i ),
+					'kiss_woo_coupon_debugger_product_id_' . $i,
+					sprintf( __( 'Product ID %d', 'kiss-woo-coupon-debugger' ), $i ),
 					array( $this, 'product_id_field_callback' ),
-					'wc-sc-debugger-settings',
-					'wc_sc_debugger_products_section',
+					'kiss-woo-coupon-debugger-settings',
+					'kiss_woo_coupon_debugger_products_section',
 					array(
-						'label_for' => 'wc_sc_debugger_product_id_' . $i,
+						'label_for' => 'kiss_woo_coupon_debugger_product_id_' . $i,
 						'field_id'  => $i,
 					)
 				);
@@ -126,7 +126,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * Callback for the products section description.
 		 */
 		public function products_section_callback() {
-			echo '<p>' . esc_html__( 'Enter up to 3 product IDs that you frequently use for testing. These will be validated and available for selection on the main debugger page.', 'wc-sc-debugger' ) . '</p>';
+			echo '<p>' . esc_html__( 'Enter up to 3 product IDs that you frequently use for testing. These will be validated and available for selection on the main debugger page.', 'kiss-woo-coupon-debugger' ) . '</p>';
 		}
 
 		/**
@@ -135,22 +135,22 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @param array $args Field arguments.
 		 */
 		public function product_id_field_callback( $args ) {
-			$options = get_option( 'wc_sc_debugger_validated_products', array() );
+			$options = get_option( 'kiss_woo_coupon_debugger_validated_products', array() );
 			$product_id = $options[ 'product_id_' . $args['field_id'] ]['id'] ?? '';
 			$product_name = $options[ 'product_id_' . $args['field_id'] ]['name'] ?? '';
 			$validation_message = $options[ 'product_id_' . $args['field_id'] ]['message'] ?? '';
 			$validation_type = $options[ 'product_id_' . $args['field_id'] ]['type'] ?? '';
 
 			printf(
-				'<input type="text" id="%1$s" name="wc_sc_debugger_validated_products[product_id_%2$s][id]" value="%3$s" class="regular-text" placeholder="%4$s" />',
+				'<input type="text" id="%1$s" name="kiss_woo_coupon_debugger_validated_products[product_id_%2$s][id]" value="%3$s" class="regular-text" placeholder="%4$s" />',
 				esc_attr( $args['label_for'] ),
 				esc_attr( $args['field_id'] ),
 				esc_attr( $product_id ),
-				esc_attr__( 'Enter Product ID', 'wc-sc-debugger' )
+				esc_attr__( 'Enter Product ID', 'kiss-woo-coupon-debugger' )
 			);
 
 			if ( ! empty( $product_name ) ) {
-				printf( '<p class="description">%s: <strong>%s</strong></p>', esc_html__( 'Current Product', 'wc-sc-debugger' ), esc_html( $product_name ) );
+				printf( '<p class="description">%s: <strong>%s</strong></p>', esc_html__( 'Current Product', 'kiss-woo-coupon-debugger' ), esc_html( $product_name ) );
 			}
 
 			if ( ! empty( $validation_message ) ) {
@@ -177,15 +177,15 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					$product = wc_get_product( $id );
 					if ( $product && $product->exists() ) {
 						$product_name = $product->get_name();
-						$message = sprintf( __( 'Product found: %s', 'wc-sc-debugger' ), $product_name );
+						$message = sprintf( __( 'Product found: %s', 'kiss-woo-coupon-debugger' ), $product_name );
 						$type = 'success';
 					} else {
-						$message = sprintf( __( 'Product ID %d not found or is invalid.', 'wc-sc-debugger' ), $id );
+						$message = sprintf( __( 'Product ID %d not found or is invalid.', 'kiss-woo-coupon-debugger' ), $id );
 						$type = 'error';
 						$id = 0; // Clear invalid ID.
 					}
 				} else {
-					$message = __( 'No product ID entered or ID is zero.', 'wc-sc-debugger' );
+					$message = __( 'No product ID entered or ID is zero.', 'kiss-woo-coupon-debugger' );
 					$type = 'info';
 				}
 
@@ -206,7 +206,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @param string $hook The current admin page hook.
 		 */
 		public function enqueue_admin_scripts( $hook ) {
-			if ( 'woocommerce_page_wc-sc-debugger' !== $hook && 'woocommerce_page_wc-sc-debugger-settings' !== $hook ) {
+			if ( 'woocommerce_page_kiss-woo-coupon-debugger' !== $hook && 'woocommerce_page_kiss-woo-coupon-debugger-settings' !== $hook ) {
 				return;
 			}
 
@@ -214,7 +214,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			wp_enqueue_style( 'select2' );
 
 			wp_enqueue_script(
-				'wc-sc-debugger-admin',
+				'kiss-woo-coupon-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
 				'1.1.0', // Updated version.
@@ -222,7 +222,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			);
 
 			wp_localize_script(
-				'wc-sc-debugger-admin',
+				'kiss-woo-coupon-debugger-admin',
 				'wcSCDebugger',
 				array(
 					'ajax_url'               => admin_url( 'admin-ajax.php' ),
@@ -232,7 +232,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			);
 
 			wp_enqueue_style(
-				'wc-sc-debugger-admin',
+				'kiss-woo-coupon-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
 				'1.0.0'
@@ -243,22 +243,22 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * Render the main debugger admin page content.
 		 */
 		public function render_admin_page() {
-			$validated_products = get_option( 'wc_sc_debugger_validated_products', array() );
+			$validated_products = get_option( 'kiss_woo_coupon_debugger_validated_products', array() );
 			?>
 			<div class="wrap woocommerce">
-				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger', 'wc-sc-debugger' ); ?></h1>
+				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger', 'kiss-woo-coupon-debugger' ); ?></h1>
 
-				<div class="wc-sc-debugger-container">
-					<div class="wc-sc-debugger-form">
+				<div class="kiss-woo-coupon-debugger-container">
+					<div class="kiss-woo-coupon-debugger-form">
 						<div class="form-field">
-							<label for="coupon_code"><?php esc_html_e( 'Coupon Code:', 'wc-sc-debugger' ); ?></label>
-							<input type="text" id="coupon_code" name="coupon_code" placeholder="<?php esc_attr_e( 'Enter coupon code', 'wc-sc-debugger' ); ?>" class="regular-text" />
+							<label for="coupon_code"><?php esc_html_e( 'Coupon Code:', 'kiss-woo-coupon-debugger' ); ?></label>
+							<input type="text" id="coupon_code" name="coupon_code" placeholder="<?php esc_attr_e( 'Enter coupon code', 'kiss-woo-coupon-debugger' ); ?>" class="regular-text" />
 						</div>
 
 						<div class="form-field">
-							<label for="debug_products_select"><?php esc_html_e( 'Select Product for Testing (optional):', 'wc-sc-debugger' ); ?></label>
+							<label for="debug_products_select"><?php esc_html_e( 'Select Product for Testing (optional):', 'kiss-woo-coupon-debugger' ); ?></label>
 							<select id="debug_products_select" name="debug_products_select" class="regular-text">
-								<option value=""><?php esc_html_e( 'No specific product', 'wc-sc-debugger' ); ?></option>
+								<option value=""><?php esc_html_e( 'No specific product', 'kiss-woo-coupon-debugger' ); ?></option>
 								<?php
 								foreach ( (array) $validated_products as $key => $product_data ) {
 									if ( ! empty( $product_data['id'] ) ) {
@@ -272,26 +272,26 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 								}
 								?>
 							</select>
-							<p class="description"><?php esc_html_e( 'Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger' ); ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-sc-debugger-settings' ) ); ?>"><?php esc_html_e( 'SC Debugger Settings', 'wc-sc-debugger' ); ?></a> <?php esc_html_e( 'page.', 'wc-sc-debugger' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Choose a pre-defined product to test coupon compatibility. Define products in the ', 'kiss-woo-coupon-debugger' ); ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=kiss-woo-coupon-debugger-settings' ) ); ?>"><?php esc_html_e( 'SC Debugger Settings', 'kiss-woo-coupon-debugger' ); ?></a> <?php esc_html_e( 'page.', 'kiss-woo-coupon-debugger' ); ?></p>
 						</div>
 
 						<div class="form-field">
-							<label for="debug_user"><?php esc_html_e( 'Select User (optional):', 'wc-sc-debugger' ); ?></label>
-							<select id="debug_user" name="debug_user" class="wc-customer-search" data-placeholder="<?php esc_attr_e( 'Search for a customer&hellip;', 'wc-sc-debugger' ); ?>" data-action="woocommerce_json_search_customers"></select>
-							<p class="description"><?php esc_html_e( 'Select a user to test user-specific coupon restrictions (e.g., "for new user only"). Leave empty for guest user.', 'wc-sc-debugger' ); ?></p>
+							<label for="debug_user"><?php esc_html_e( 'Select User (optional):', 'kiss-woo-coupon-debugger' ); ?></label>
+							<select id="debug_user" name="debug_user" class="wc-customer-search" data-placeholder="<?php esc_attr_e( 'Search for a customer&hellip;', 'kiss-woo-coupon-debugger' ); ?>" data-action="woocommerce_json_search_customers"></select>
+							<p class="description"><?php esc_html_e( 'Select a user to test user-specific coupon restrictions (e.g., "for new user only"). Leave empty for guest user.', 'kiss-woo-coupon-debugger' ); ?></p>
 						</div>
 
-						<button id="run_debug" class="button button-primary"><?php esc_html_e( 'Run Debug', 'wc-sc-debugger' ); ?></button>
-						<button id="clear_debug" class="button button-secondary"><?php esc_html_e( 'Clear Output', 'wc-sc-debugger' ); ?></button>
+						<button id="run_debug" class="button button-primary"><?php esc_html_e( 'Run Debug', 'kiss-woo-coupon-debugger' ); ?></button>
+						<button id="clear_debug" class="button button-secondary"><?php esc_html_e( 'Clear Output', 'kiss-woo-coupon-debugger' ); ?></button>
 					</div>
 
-					<div class="wc-sc-debugger-output">
-						<h2><?php esc_html_e( 'Debugging Output', 'wc-sc-debugger' ); ?></h2>
+					<div class="kiss-woo-coupon-debugger-output">
+						<h2><?php esc_html_e( 'Debugging Output', 'kiss-woo-coupon-debugger' ); ?></h2>
 						<div id="debug_results" class="debug-results">
-							<p><?php esc_html_e( 'Enter a coupon code and click "Run Debug" to see the processing details.', 'wc-sc-debugger' ); ?></p>
+							<p><?php esc_html_e( 'Enter a coupon code and click "Run Debug" to see the processing details.', 'kiss-woo-coupon-debugger' ); ?></p>
 						</div>
 						<div class="loading-indicator" style="display: none;">
-							<p><?php esc_html_e( 'Debugging in progress...', 'wc-sc-debugger' ); ?></p>
+							<p><?php esc_html_e( 'Debugging in progress...', 'kiss-woo-coupon-debugger' ); ?></p>
 						</div>
 					</div>
 				</div>
@@ -305,11 +305,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		public function render_settings_page() {
 			?>
 			<div class="wrap woocommerce">
-				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger Settings', 'wc-sc-debugger' ); ?></h1>
+				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger Settings', 'kiss-woo-coupon-debugger' ); ?></h1>
 				<form method="post" action="options.php">
 					<?php
-					settings_fields( 'wc_sc_debugger_options_group' );
-					do_settings_sections( 'wc-sc-debugger-settings' );
+					settings_fields( 'kiss_woo_coupon_debugger_options_group' );
+					do_settings_sections( 'kiss-woo-coupon-debugger-settings' );
 					submit_button();
 					?>
 				</form>
@@ -324,11 +324,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			check_ajax_referer( 'wc-sc-debug-coupon-nonce', 'security' );
 
 			if ( ! current_user_can( 'manage_woocommerce' ) ) {
-				wp_send_json_error( array( 'message' => __( 'You do not have permission to perform this action.', 'wc-sc-debugger' ) ) );
+				wp_send_json_error( array( 'message' => __( 'You do not have permission to perform this action.', 'kiss-woo-coupon-debugger' ) ) );
 			}
 
 			if ( ! function_exists( 'WC' ) || ! isset( WC()->cart ) || ! is_object( WC()->cart ) || ! isset( WC()->session ) || ! is_object( WC()->session ) ) {
-				wp_send_json_error( array( 'message' => __( 'WooCommerce cart or session is not fully loaded. Please ensure WooCommerce is active and properly initialized.', 'wc-sc-debugger' ) ) );
+				wp_send_json_error( array( 'message' => __( 'WooCommerce cart or session is not fully loaded. Please ensure WooCommerce is active and properly initialized.', 'kiss-woo-coupon-debugger' ) ) );
 			}
 
 			$coupon_code = sanitize_text_field( wp_unslash( $_POST['coupon_code'] ?? '' ) );
@@ -336,7 +336,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			$user_id     = absint( wp_unslash( $_POST['user_id'] ?? 0 ) );
 
 			if ( empty( $coupon_code ) ) {
-				wp_send_json_error( array( 'message' => __( 'Please enter a coupon code.', 'wc-sc-debugger' ) ) );
+				wp_send_json_error( array( 'message' => __( 'Please enter a coupon code.', 'kiss-woo-coupon-debugger' ) ) );
 			}
 
 			self::$debug_messages = array();
@@ -351,11 +351,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				$this->stop_hook_tracking();
 
 				if ( is_wp_error( $result ) ) {
-					self::log_message( 'error', sprintf( __( 'Coupon application failed: %s', 'wc-sc-debugger' ), $result->get_error_message() ) );
+					self::log_message( 'error', sprintf( __( 'Coupon application failed: %s', 'kiss-woo-coupon-debugger' ), $result->get_error_message() ) );
 				} elseif ( ! $result ) {
-					self::log_message( 'warning', __( 'Coupon could not be applied or is invalid.', 'wc-sc-debugger' ) );
+					self::log_message( 'warning', __( 'Coupon could not be applied or is invalid.', 'kiss-woo-coupon-debugger' ) );
 				} else {
-					self::log_message( 'success', sprintf( __( 'Coupon "%s" processed successfully.', 'wc-sc-debugger' ), $coupon_code ) );
+					self::log_message( 'success', sprintf( __( 'Coupon "%s" processed successfully.', 'kiss-woo-coupon-debugger' ), $coupon_code ) );
 				}
 
 				wp_send_json_success( array(
@@ -366,7 +366,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			} catch ( Exception $e ) {
 				error_log( 'WC SC Debugger AJAX Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine() );
 				wp_send_json_error( array(
-					'message' => __( 'An unexpected server error occurred during debugging. Please check your server error logs for more details.', 'wc-sc-debugger' ),
+					'message' => __( 'An unexpected server error occurred during debugging. Please check your server error logs for more details.', 'kiss-woo-coupon-debugger' ),
 					'debug_info' => $e->getMessage(),
 				) );
 			}
@@ -398,38 +398,38 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			add_filter( 'woocommerce_coupon_get_discount_amount', array( $this, 'track_filter' ), 9999, 5 );
 			add_filter( 'woocommerce_apply_individual_use_coupon', array( $this, 'track_filter' ), 9999, 3 );
 			add_filter( 'woocommerce_apply_with_individual_use_coupon', array( $this, 'track_filter' ), 9999, 4 );
-			add_filter( 'wc_sc_validate_coupon_amount', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_is_send_coupon_email', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_is_coupon_restriction_available', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_percent_discount_types', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_type', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'wc_sc_coupon_amount', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_generated_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_max_fields_to_show_in_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_max_restricted_category_names', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_max_restricted_product_names', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_generate_unique_coupon_code', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_code_allowed_characters', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_style_attributes', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_coupon_container_classes', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_coupon_content_classes', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_coupon_design_thumbnail_src_set', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_design_thumbnail_src', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_storewide_offer_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_get_wc_sc_coupon_styles', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_get_coupon_styles', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'wc_sc_coupon_cookie_life', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_is_generated_store_credit_includes_tax', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_read_price', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_write_price', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_after_get_post_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_before_update_post_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_after_get_session', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_before_set_session', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_after_get_order_item_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_before_update_order_item_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_pending_order_statuses', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_order_actions_to_ignore_for_email', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_validate_coupon_amount', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_is_send_coupon_email', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_is_coupon_restriction_available', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_percent_discount_types', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_coupon_type', array( $this, 'track_filter' ), 9999, 3 );
+			add_filter( 'kiss_woo_coupon_amount', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_generated_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_max_fields_to_show_in_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_max_restricted_category_names', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_max_restricted_product_names', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_generate_unique_coupon_code', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_coupon_code_allowed_characters', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_coupon_style_attributes', array( $this, 'track_filter' ), 9999, 1 );
+			add_filter( 'kiss_woo_coupon_container_classes', array( $this, 'track_filter' ), 9999, 1 );
+			add_filter( 'kiss_woo_coupon_content_classes', array( $this, 'track_filter' ), 9999, 1 );
+			add_filter( 'kiss_woo_coupon_design_thumbnail_src_set', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_coupon_design_thumbnail_src', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_storewide_offer_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_get_kiss_woo_coupon_styles', array( $this, 'track_filter' ), 9999, 1 );
+			add_filter( 'kiss_woo_get_coupon_styles', array( $this, 'track_filter' ), 9999, 3 );
+			add_filter( 'kiss_woo_coupon_cookie_life', array( $this, 'track_filter' ), 9999, 1 );
+			add_filter( 'kiss_woo_is_generated_store_credit_includes_tax', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_read_price', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_write_price', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_after_get_post_meta', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_before_update_post_meta', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_after_get_session', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_before_set_session', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_after_get_order_item_meta', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_before_update_order_item_meta', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_pending_order_statuses', array( $this, 'track_filter' ), 9999, 2 );
+			add_filter( 'kiss_woo_order_actions_to_ignore_for_email', array( $this, 'track_filter' ), 9999, 2 );
 			add_filter( 'woocommerce_coupon_error', array( $this, 'track_filter' ), 9999, 3 );
 
 			// Actions related to coupon processing.
@@ -438,7 +438,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			add_action( 'woocommerce_coupon_loaded', array( $this, 'track_action' ), 9999, 1 );
 			add_action( 'woocommerce_before_calculate_totals', array( $this, 'track_action' ), 9999, 1 );
 			add_action( 'woocommerce_after_calculate_totals', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'wc_sc_new_coupon_generated', array( $this, 'track_action' ), 9999, 1 );
+			add_action( 'kiss_woo_new_coupon_generated', array( $this, 'track_action' ), 9999, 1 );
 			add_action( 'smart_coupons_after_calculate_totals', array( $this, 'track_action' ), 9999, 0 );
 			add_action( 'sc_after_order_calculate_discount_amount', array( $this, 'track_action' ), 9999, 1 );
 		}
@@ -453,38 +453,38 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			remove_filter( 'woocommerce_coupon_get_discount_amount', array( $this, 'track_filter' ), 9999 );
 			remove_filter( 'woocommerce_apply_individual_use_coupon', array( $this, 'track_filter' ), 9999 );
 			remove_filter( 'woocommerce_apply_with_individual_use_coupon', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_validate_coupon_amount', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_is_send_coupon_email', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_is_coupon_restriction_available', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_percent_discount_types', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_type', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_amount', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_generated_coupon_description', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_max_fields_to_show_in_coupon_description', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_max_restricted_category_names', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_max_restricted_product_names', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_generate_unique_coupon_code', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_code_allowed_characters', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_style_attributes', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_container_classes', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_content_classes', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_design_thumbnail_src_set', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_design_thumbnail_src', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_storewide_offer_coupon_description', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_get_wc_sc_coupon_styles', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_get_coupon_styles', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_cookie_life', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_is_generated_store_credit_includes_tax', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_read_price', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_write_price', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_after_get_post_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_before_update_post_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_after_get_session', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_before_set_session', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_after_get_order_item_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_before_update_order_item_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_pending_order_statuses', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_order_actions_to_ignore_for_email', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_validate_coupon_amount', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_is_send_coupon_email', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_is_coupon_restriction_available', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_percent_discount_types', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_type', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_amount', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_generated_coupon_description', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_max_fields_to_show_in_coupon_description', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_max_restricted_category_names', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_max_restricted_product_names', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_generate_unique_coupon_code', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_code_allowed_characters', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_style_attributes', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_container_classes', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_content_classes', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_design_thumbnail_src_set', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_design_thumbnail_src', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_storewide_offer_coupon_description', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_get_kiss_woo_coupon_styles', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_get_coupon_styles', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_coupon_cookie_life', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_is_generated_store_credit_includes_tax', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_read_price', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_write_price', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_after_get_post_meta', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_before_update_post_meta', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_after_get_session', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_before_set_session', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_after_get_order_item_meta', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_before_update_order_item_meta', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_pending_order_statuses', array( $this, 'track_filter' ), 9999 );
+			remove_filter( 'kiss_woo_order_actions_to_ignore_for_email', array( $this, 'track_filter' ), 9999 );
 			remove_filter( 'woocommerce_coupon_error', array( $this, 'track_filter' ), 9999 );
 
 			remove_action( 'woocommerce_applied_coupon', array( $this, 'track_action' ), 9999 );
@@ -492,7 +492,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			remove_action( 'woocommerce_coupon_loaded', array( $this, 'track_action' ), 9999 );
 			remove_action( 'woocommerce_before_calculate_totals', array( $this, 'track_action' ), 9999 );
 			remove_action( 'woocommerce_after_calculate_totals', array( $this, 'track_action' ), 9999 );
-			remove_action( 'wc_sc_new_coupon_generated', array( $this, 'track_action' ), 9999 );
+			remove_action( 'kiss_woo_new_coupon_generated', array( $this, 'track_action' ), 9999 );
 			remove_action( 'smart_coupons_after_calculate_totals', array( $this, 'track_action' ), 9999 );
 			remove_action( 'sc_after_order_calculate_discount_amount', array( $this, 'track_action' ), 9999 );
 		}
@@ -508,7 +508,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			$filter_name = current_filter();
 			self::log_message(
 				'filter',
-				sprintf( __( 'Filter: %s', 'wc-sc-debugger' ), $filter_name ),
+				sprintf( __( 'Filter: %s', 'kiss-woo-coupon-debugger' ), $filter_name ),
 				array(
 					'args'    => $this->sanitize_for_logging( $args ),
 					'return'  => $this->sanitize_for_logging( $value ),
@@ -526,7 +526,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			$action_name = current_action();
 			self::log_message(
 				'action',
-				sprintf( __( 'Action: %s', 'wc-sc-debugger' ), $action_name ),
+				sprintf( __( 'Action: %s', 'kiss-woo-coupon-debugger' ), $action_name ),
 				array(
 					'args' => $this->sanitize_for_logging( $args ),
 				)
@@ -620,16 +620,16 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				WC()->session->set( 'applied_coupons', null );
 				WC()->session->set( 'sc_coupon_valid', null );
 				WC()->session->set( 'sc_coupon_error', null );
-				WC()->session->set( 'wc_sc_cart_smart_coupons', array() );
+				WC()->session->set( 'kiss_woo_cart_smart_coupons', array() );
 			}
 
 			// Simulate user login if a user ID is provided.
 			if ( $user_id > 0 && get_user_by( 'id', $user_id ) ) {
 				wp_set_current_user( $user_id );
-				self::log_message( 'info', sprintf( __( 'Simulating user ID: %d', 'wc-sc-debugger' ), $user_id ) );
+				self::log_message( 'info', sprintf( __( 'Simulating user ID: %d', 'kiss-woo-coupon-debugger' ), $user_id ) );
 			} else {
 				wp_set_current_user( 0 ); // Simulate guest user.
-				self::log_message( 'info', __( 'Simulating guest user.', 'wc-sc-debugger' ) );
+				self::log_message( 'info', __( 'Simulating guest user.', 'kiss-woo-coupon-debugger' ) );
 			}
 
 			// Add products to the cart.
@@ -638,9 +638,9 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					$product = wc_get_product( $product_id );
 					if ( $product && $product->is_purchasable() ) {
 						WC()->cart->add_to_cart( $product_id, 1 );
-						self::log_message( 'info', sprintf( __( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						self::log_message( 'info', sprintf( __( 'Added product to cart: %s (ID: %d)', 'kiss-woo-coupon-debugger' ), $product->get_name(), $product_id ) );
 					} else {
-						self::log_message( 'warning', sprintf( __( 'Could not add product ID %d to cart (might not be purchasable or found).', 'wc-sc-debugger' ), $product_id ) );
+						self::log_message( 'warning', sprintf( __( 'Could not add product ID %d to cart (might not be purchasable or found).', 'kiss-woo-coupon-debugger' ), $product_id ) );
 					}
 				}
 			}
@@ -650,33 +650,33 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				$dummy_product_id = $this->get_or_create_dummy_product();
 				if ( $dummy_product_id ) {
 					WC()->cart->add_to_cart( $dummy_product_id, 1 );
-					self::log_message( 'info', sprintf( __( 'Cart was empty, added dummy product (ID: %d) for testing general coupons.', 'wc-sc-debugger' ), $dummy_product_id ) );
+					self::log_message( 'info', sprintf( __( 'Cart was empty, added dummy product (ID: %d) for testing general coupons.', 'kiss-woo-coupon-debugger' ), $dummy_product_id ) );
 				} else {
-					self::log_message( 'error', __( 'Could not create or find a dummy product for testing, and cart is empty.', 'wc-sc-debugger' ) );
-					return new WP_Error( 'no_dummy_product', __( 'Cannot proceed without a product in cart for testing.', 'wc-sc-debugger' ) );
+					self::log_message( 'error', __( 'Could not create or find a dummy product for testing, and cart is empty.', 'kiss-woo-coupon-debugger' ) );
+					return new WP_Error( 'no_dummy_product', __( 'Cannot proceed without a product in cart for testing.', 'kiss-woo-coupon-debugger' ) );
 				}
 			}
 
 			WC()->cart->calculate_totals();
 
-			self::log_message( 'info', sprintf( __( 'Attempting to apply coupon: "%s"', 'wc-sc-debugger' ), $coupon_code ) );
+			self::log_message( 'info', sprintf( __( 'Attempting to apply coupon: "%s"', 'kiss-woo-coupon-debugger' ), $coupon_code ) );
 
 			$coupon_applied = false;
 			try {
 				$coupon_applied = WC()->cart->apply_coupon( $coupon_code );
 
 				if ( is_wp_error( $coupon_applied ) ) {
-					self::log_message( 'error', sprintf( __( 'Failed to apply coupon: %s', 'wc-sc-debugger' ), $coupon_applied->get_error_message() ) );
+					self::log_message( 'error', sprintf( __( 'Failed to apply coupon: %s', 'kiss-woo-coupon-debugger' ), $coupon_applied->get_error_message() ) );
 					$coupon_applied = false;
 				} elseif ( ! $coupon_applied ) {
-					self::log_message( 'error', __( 'Coupon could not be applied. Check coupon validity and restrictions.', 'wc-sc-debugger' ) );
+					self::log_message( 'error', __( 'Coupon could not be applied. Check coupon validity and restrictions.', 'kiss-woo-coupon-debugger' ) );
 				} else {
 					WC()->cart->calculate_totals();
 					$cart_total = WC()->cart->get_total( 'edit' );
-					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'wc-sc-debugger' ), wc_price( $cart_total ) ) );
+					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'kiss-woo-coupon-debugger' ), wc_price( $cart_total ) ) );
 				}
 			} catch ( Exception $e ) {
-				self::log_message( 'error', sprintf( __( 'An exception occurred during coupon application: %s', 'wc-sc-debugger' ), $e->getMessage() ) );
+				self::log_message( 'error', sprintf( __( 'An exception occurred during coupon application: %s', 'kiss-woo-coupon-debugger' ), $e->getMessage() ) );
 				$coupon_applied = false;
 			}
 
@@ -713,7 +713,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @return int|bool Product ID on success, false on failure.
 		 */
 		private function get_or_create_dummy_product() {
-			$product_id = get_option( 'wc_sc_debugger_dummy_product_id' );
+			$product_id = get_option( 'kiss_woo_coupon_debugger_dummy_product_id' );
 
 			if ( $product_id && ( $product = wc_get_product( $product_id ) ) && $product->exists() ) {
 				return $product_id;
@@ -731,32 +731,32 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			$new_product_id = $new_product->save();
 
 			if ( $new_product_id ) {
-				update_option( 'wc_sc_debugger_dummy_product_id', $new_product_id );
+				update_option( 'kiss_woo_coupon_debugger_dummy_product_id', $new_product_id );
 				return $new_product_id;
 			}
 
 			return false;
 		}
 
-	} // End class WC_SC_Debugger.
+	} // End class KISS_woo_coupon_debugger.
 
 	// Initialize the plugin.
-	WC_SC_Debugger::get_instance();
+	KISS_woo_coupon_debugger::get_instance();
 
 	/**
 	 * Activation hook.
 	 */
-	register_activation_hook( __FILE__, 'wc_sc_debugger_activate' );
-	function wc_sc_debugger_activate() {
+	register_activation_hook( __FILE__, 'kiss_woo_coupon_debugger_activate' );
+	function kiss_woo_coupon_debugger_activate() {
 		// Activation logic can go here.
 	}
 
 	/**
 	 * Deactivation hook.
 	 */
-	register_deactivation_hook( __FILE__, 'wc_sc_debugger_deactivate' );
-	function wc_sc_debugger_deactivate() {
-		delete_option( 'wc_sc_debugger_dummy_product_id' );
+	register_deactivation_hook( __FILE__, 'kiss_woo_coupon_debugger_deactivate' );
+	function kiss_woo_coupon_debugger_deactivate() {
+		delete_option( 'kiss_woo_coupon_debugger_dummy_product_id' );
 	}
 
 } // End if class_exists.

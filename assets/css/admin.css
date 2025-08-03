@@ -1,5 +1,5 @@
 /* General container styling */
-.wc-sc-debugger-container {
+.kiss-woo-coupon-debugger-container {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
@@ -7,7 +7,7 @@
 }
 
 /* Form section styling */
-.wc-sc-debugger-form {
+.kiss-woo-coupon-debugger-form {
     flex: 1;
     min-width: 300px;
     background: #fff;
@@ -16,29 +16,29 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.wc-sc-debugger-form .form-field {
+.kiss-woo-coupon-debugger-form .form-field {
     margin-bottom: 15px;
 }
 
-.wc-sc-debugger-form label {
+.kiss-woo-coupon-debugger-form label {
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
 }
 
-.wc-sc-debugger-form input[type="text"],
-.wc-sc-debugger-form .select2-container {
+.kiss-woo-coupon-debugger-form input[type="text"],
+.kiss-woo-coupon-debugger-form .select2-container {
     width: 100%;
     box-sizing: border-box;
 }
 
-.wc-sc-debugger-form .description {
+.kiss-woo-coupon-debugger-form .description {
     font-size: 0.9em;
     color: #666;
     margin-top: 5px;
 }
 
-.wc-sc-debugger-form button {
+.kiss-woo-coupon-debugger-form button {
     margin-right: 10px;
     padding: 8px 15px;
     border-radius: 5px;
@@ -46,7 +46,7 @@
 }
 
 /* Output section styling */
-.wc-sc-debugger-output {
+.kiss-woo-coupon-debugger-output {
     flex: 2;
     min-width: 400px;
     background: #fff;
@@ -55,7 +55,7 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.wc-sc-debugger-output h2 {
+.kiss-woo-coupon-debugger-output h2 {
     margin-top: 0;
     margin-bottom: 15px;
     color: #333;
