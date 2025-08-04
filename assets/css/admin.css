@@ -73,6 +73,22 @@
     cursor: pointer;
 }
 
+/* Product Status Notice */
+.product-status-notice {
+    margin-top: 5px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: none; /* Hidden by default */
+}
+.product-status-notice.error {
+    display: block;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+    border: 1px solid transparent;
+}
+
+
 /* Output section styling */
 .wc-sc-debugger-output {
     flex: 2;

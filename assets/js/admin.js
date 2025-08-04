@@ -6,9 +6,11 @@ jQuery(document).ready(function($) {
     var $clearDebugButton = $('#clear_debug');
     var $debugResults = $('#debug_results');
     var $loadingIndicator = $('.loading-indicator');
+    var $productStockStatus = $('#product_stock_status');
 
-    // The product dropdown is a standard select, so it doesn't need SelectWoo initialization.
-    // We only initialize SelectWoo for the customer search, which uses AJAX.
+    // Store product details fetched via AJAX
+    var productDetailsCache = {};
+
     $debugUserSelect.selectWoo({
         ajax: {
             url: wcSCDebugger.ajax_url,
@@ -16,7 +18,7 @@ jQuery(document).ready(function($) {
             delay: 250,
             data: function (params) {
                 return {
-                    term: params.term, // search term
+                    term: params.term,
                     action: 'woocommerce_json_search_customers',
                     security: wcSCDebugger.search_customers_nonce
                 };
@@ -34,20 +36,64 @@ jQuery(document).ready(function($) {
             },
             cache: true
         },
-        minimumInputLength: 1, // Start search after 1 character
-        allowClear: true, // Allow clearing the selection
+        minimumInputLength: 1,
+        allowClear: true,
         placeholder: $(this).data('placeholder'),
         escapeMarkup: function (markup) { return markup; }
+    });
+
+    $debugProductsSelect.on('change', function() {
+        var productId = $(this).val();
+        $productStockStatus.empty().removeClass('error notice-error');
+
+        if (!productId) {
+            $runDebugButton.prop('disabled', false);
+            return;
+        }
+
+        // Fetch product details
+        $.ajax({
+            url: wcSCDebugger.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'wc_sc_get_product_details',
+                security: wcSCDebugger.get_product_details_nonce,
+                product_id: productId
+            },
+            success: function(response) {
+                if (response.success) {
+                    productDetailsCache[productId] = response.data;
+                    if (!response.data.is_in_stock) {
+                        $productStockStatus.text('This product is out of stock.').addClass('error notice-error');
+                        $runDebugButton.prop('disabled', true);
+                    } else {
+                        $runDebugButton.prop('disabled', false);
+                    }
+                } else {
+                    $productStockStatus.text(response.data.message || 'Error checking stock.').addClass('error notice-error');
+                    $runDebugButton.prop('disabled', true);
+                }
+            }
+        });
     });
 
     $runDebugButton.on('click', function() {
         var couponCode = $couponCodeInput.val().trim();
         var productId = $debugProductsSelect.val();
         var userId = $debugUserSelect.val();
+        var variationId = 0; // Default to no variation
 
         if (!couponCode) {
             alert('Please enter a coupon code to debug.');
             return;
+        }
+
+        // If a product is selected and it's a variable product, pick a random variation
+        if (productId && productDetailsCache[productId]) {
+            var details = productDetailsCache[productId];
+            if (details.product_type === 'variable' && details.available_variations.length > 0) {
+                variationId = details.available_variations[Math.floor(Math.random() * details.available_variations.length)];
+            }
         }
 
         $debugResults.empty();
@@ -62,11 +108,17 @@ jQuery(document).ready(function($) {
                 security: wcSCDebugger.debug_coupon_nonce,
                 coupon_code: couponCode,
                 product_id: productId,
+                variation_id: variationId,
                 user_id: userId
             },
             success: function(response) {
                 $loadingIndicator.hide();
                 $runDebugButton.prop('disabled', false);
+                // Re-enable button but respect stock status
+                if ($debugProductsSelect.val() && !$productStockStatus.is(':empty')) {
+                     $runDebugButton.prop('disabled', true);
+                }
+
                 if (response.success) {
                     displayDebugMessages(response.data.messages);
                 } else {
@@ -110,10 +162,8 @@ jQuery(document).ready(function($) {
                     return JSON.stringify(obj, function(key, value) {
                         if (typeof value === 'object' && value !== null) {
                             if (cache.has(value)) {
-                                // Circular reference found, discard key
                                 return '[Circular Reference]';
                             }
-                            // Store value in our collection
                             cache.add(value);
                         }
                         return value;
