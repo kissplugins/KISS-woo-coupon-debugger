@@ -3,11 +3,11 @@
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
- * License:     GPL-3.0+
- * License URI: http://www.gnu.org/licenses/gpl-3.0.html
+ * License:     GPL v2.0
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: wc-sc-debugger
  * Domain Path: /languages
  *
@@ -242,7 +242,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.3.0',
+				'1.4.0',
 				true
 			);
 
@@ -260,7 +260,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
-				'1.3.0'
+				'1.4.0'
 			);
 		}
 
@@ -738,17 +738,9 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				$products_added = false;
 				if ( ! empty( $product_ids ) ) {
 					foreach ( $product_ids as $product_id ) {
-						$product = wc_get_product( $product_id );
-						if ( $product && $product->is_purchasable() && $product->is_in_stock() ) {
-							$cart_item_key = WC()->cart->add_to_cart( $product_id, 1 );
-							if ( $cart_item_key ) {
-								$products_added = true;
-								self::log_message( 'info', sprintf( __( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
-							} else {
-								self::log_message( 'warning', sprintf( __( 'Failed to add product ID %d to cart.', 'wc-sc-debugger' ), $product_id ) );
-							}
-						} else {
-							self::log_message( 'warning', sprintf( __( 'Product ID %d is not purchasable or not in stock.', 'wc-sc-debugger' ), $product_id ) );
+						$added = $this->add_product_to_cart( $product_id );
+						if ( $added ) {
+							$products_added = true;
 						}
 					}
 				}
@@ -871,6 +863,129 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			// Re-enable hooks tracking if it was active
 			if ( $hooks_were_active ) {
 				$this->hooks_tracking_active = true;
+			}
+		}
+
+		/**
+		 * Add a product to cart, handling variable products by selecting first available variation
+		 *
+		 * @param int $product_id Product ID to add
+		 * @return bool True if product was added successfully
+		 */
+		private function add_product_to_cart( $product_id ) {
+			$product = wc_get_product( $product_id );
+			
+			if ( ! $product ) {
+				self::log_message( 'warning', sprintf( __( 'Product ID %d not found.', 'wc-sc-debugger' ), $product_id ) );
+				return false;
+			}
+
+			// Handle variable products
+			if ( $product->is_type( 'variable' ) ) {
+				self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a variable product. Finding first available variation...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+				
+				// Get available variations
+				$variations = $product->get_available_variations();
+				
+				if ( empty( $variations ) ) {
+					self::log_message( 'warning', sprintf( __( 'No available variations found for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+					return false;
+				}
+				
+				// Find the first variation that's purchasable and in stock
+				foreach ( $variations as $variation_data ) {
+					$variation_id = $variation_data['variation_id'];
+					$variation = wc_get_product( $variation_id );
+					
+					if ( $variation && $variation->is_purchasable() && $variation->is_in_stock() ) {
+						// Get the variation attributes
+						$variation_attributes = $variation_data['attributes'];
+						
+						// Add variation to cart
+						$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, $variation_id, $variation_attributes );
+						
+						if ( $cart_item_key ) {
+							// Log the selected attributes
+							$attribute_string = '';
+							foreach ( $variation_attributes as $attr_name => $attr_value ) {
+								$taxonomy = str_replace( 'attribute_', '', $attr_name );
+								$term = get_term_by( 'slug', $attr_value, $taxonomy );
+								$label = $term ? $term->name : $attr_value;
+								$attribute_string .= ucfirst( str_replace( 'pa_', '', $taxonomy ) ) . ': ' . $label . ', ';
+							}
+							$attribute_string = rtrim( $attribute_string, ', ' );
+							
+							self::log_message( 'success', sprintf( 
+								__( 'Added variable product to cart: %s (ID: %d, Variation ID: %d) - %s', 'wc-sc-debugger' ), 
+								$product->get_name(), 
+								$product_id, 
+								$variation_id,
+								$attribute_string
+							) );
+							return true;
+						}
+					}
+				}
+				
+				self::log_message( 'warning', sprintf( __( 'No purchasable variations in stock for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+				return false;
+				
+			} elseif ( $product->is_type( 'grouped' ) ) {
+				// Handle grouped products
+				self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a grouped product. Adding first available child product...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+				
+				$children = $product->get_children();
+				if ( ! empty( $children ) ) {
+					foreach ( $children as $child_id ) {
+						$child_product = wc_get_product( $child_id );
+						if ( $child_product && $child_product->is_purchasable() && $child_product->is_in_stock() ) {
+							$cart_item_key = WC()->cart->add_to_cart( $child_id, 1 );
+							if ( $cart_item_key ) {
+								self::log_message( 'success', sprintf( 
+									__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ), 
+									$child_product->get_name(), 
+									$child_id,
+									$product_id 
+								) );
+								return true;
+							}
+						}
+					}
+				}
+				
+				self::log_message( 'warning', sprintf( __( 'No purchasable child products found for grouped product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+				return false;
+				
+			} else {
+				// Handle simple products and other types
+				if ( $product->is_purchasable() && $product->is_in_stock() ) {
+					$cart_item_key = WC()->cart->add_to_cart( $product_id, 1 );
+					if ( $cart_item_key ) {
+						self::log_message( 'success', sprintf( 
+							__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), 
+							$product->get_name(), 
+							$product_id 
+						) );
+						return true;
+					} else {
+						self::log_message( 'warning', sprintf( __( 'Failed to add product ID %d to cart.', 'wc-sc-debugger' ), $product_id ) );
+						return false;
+					}
+				} else {
+					$reasons = array();
+					if ( ! $product->is_purchasable() ) {
+						$reasons[] = __( 'not purchasable', 'wc-sc-debugger' );
+					}
+					if ( ! $product->is_in_stock() ) {
+						$reasons[] = __( 'out of stock', 'wc-sc-debugger' );
+					}
+					self::log_message( 'warning', sprintf( 
+						__( 'Product ID %d cannot be added to cart: %s.', 'wc-sc-debugger' ), 
+						$product_id,
+						implode( ', ', $reasons )
+					) );
+					return false;
+				}
 			}
 		}
 
