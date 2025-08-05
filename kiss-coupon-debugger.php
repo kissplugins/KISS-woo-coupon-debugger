@@ -3,11 +3,11 @@
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.4.0
+ * Version:     1.4.1
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
- * License:     GPL v2.0
- * License URI: http://www.gnu.org/licenses/gpl-2.0.html
+ * License:     GPL-3.0+
+ * License URI: http://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: wc-sc-debugger
  * Domain Path: /languages
  *
@@ -242,7 +242,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.4.0',
+				'1.4.1',
 				true
 			);
 
@@ -260,7 +260,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
-				'1.4.0'
+				'1.4.1'
 			);
 		}
 
@@ -825,12 +825,16 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 
 				// Restore cart contents
 				foreach ( $original_cart_contents as $cart_item_key => $cart_item ) {
-					$product_id = $cart_item['product_id'];
-					$quantity = $cart_item['quantity'];
+					$product_id = isset( $cart_item['product_id'] ) ? $cart_item['product_id'] : 0;
+					$quantity = isset( $cart_item['quantity'] ) ? $cart_item['quantity'] : 1;
 					$variation_id = isset( $cart_item['variation_id'] ) ? $cart_item['variation_id'] : 0;
-					$variation = isset( $cart_item['variation'] ) ? $cart_item['variation'] : array();
+					$variation = isset( $cart_item['variation'] ) && is_array( $cart_item['variation'] ) ? $cart_item['variation'] : array();
+					$cart_item_data = isset( $cart_item['data'] ) && is_array( $cart_item['data'] ) ? $cart_item['data'] : array();
 					
-					WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation );
+					// Ensure we have a valid product ID
+					if ( $product_id ) {
+						WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation, $cart_item_data );
+					}
 				}
 
 				// Restore session data
@@ -880,112 +884,146 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				return false;
 			}
 
-			// Handle variable products
-			if ( $product->is_type( 'variable' ) ) {
-				self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a variable product. Finding first available variation...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
-				
-				// Get available variations
-				$variations = $product->get_available_variations();
-				
-				if ( empty( $variations ) ) {
-					self::log_message( 'warning', sprintf( __( 'No available variations found for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
-					return false;
-				}
-				
-				// Find the first variation that's purchasable and in stock
-				foreach ( $variations as $variation_data ) {
-					$variation_id = $variation_data['variation_id'];
-					$variation = wc_get_product( $variation_id );
+			try {
+				// Handle variable products
+				if ( $product->is_type( 'variable' ) ) {
+					self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a variable product. Finding first available variation...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
 					
-					if ( $variation && $variation->is_purchasable() && $variation->is_in_stock() ) {
-						// Get the variation attributes
-						$variation_attributes = $variation_data['attributes'];
-						
-						// Add variation to cart
-						$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, $variation_id, $variation_attributes );
-						
-						if ( $cart_item_key ) {
-							// Log the selected attributes
-							$attribute_string = '';
-							foreach ( $variation_attributes as $attr_name => $attr_value ) {
-								$taxonomy = str_replace( 'attribute_', '', $attr_name );
-								$term = get_term_by( 'slug', $attr_value, $taxonomy );
-								$label = $term ? $term->name : $attr_value;
-								$attribute_string .= ucfirst( str_replace( 'pa_', '', $taxonomy ) ) . ': ' . $label . ', ';
-							}
-							$attribute_string = rtrim( $attribute_string, ', ' );
-							
-							self::log_message( 'success', sprintf( 
-								__( 'Added variable product to cart: %s (ID: %d, Variation ID: %d) - %s', 'wc-sc-debugger' ), 
-								$product->get_name(), 
-								$product_id, 
-								$variation_id,
-								$attribute_string
-							) );
-							return true;
-						}
+					// Get available variations
+					$variations = $product->get_available_variations();
+					
+					if ( empty( $variations ) ) {
+						self::log_message( 'warning', sprintf( __( 'No available variations found for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+						return false;
 					}
-				}
-				
-				self::log_message( 'warning', sprintf( __( 'No purchasable variations in stock for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
-				return false;
-				
-			} elseif ( $product->is_type( 'grouped' ) ) {
-				// Handle grouped products
-				self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a grouped product. Adding first available child product...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
-				
-				$children = $product->get_children();
-				if ( ! empty( $children ) ) {
-					foreach ( $children as $child_id ) {
-						$child_product = wc_get_product( $child_id );
-						if ( $child_product && $child_product->is_purchasable() && $child_product->is_in_stock() ) {
-							$cart_item_key = WC()->cart->add_to_cart( $child_id, 1 );
+					
+					// Find the first variation that's purchasable and in stock
+					foreach ( $variations as $variation_data ) {
+						$variation_id = $variation_data['variation_id'];
+						$variation = wc_get_product( $variation_id );
+						
+						if ( $variation && $variation->is_purchasable() && $variation->is_in_stock() ) {
+							// Get the variation attributes - ensure they're properly formatted
+							$variation_attributes = array();
+							if ( isset( $variation_data['attributes'] ) && is_array( $variation_data['attributes'] ) ) {
+								foreach ( $variation_data['attributes'] as $attr_name => $attr_value ) {
+									// Ensure attribute names and values are strings
+									$variation_attributes[ (string) $attr_name ] = (string) $attr_value;
+								}
+							}
+							
+							// Add variation to cart with explicit parameters
+							$cart_item_data = array();
+							$cart_item_key = WC()->cart->add_to_cart( 
+								$product_id, 
+								1, 
+								$variation_id, 
+								$variation_attributes, 
+								$cart_item_data 
+							);
+							
 							if ( $cart_item_key ) {
+								// Ensure cart item data is properly structured
+								WC()->cart->cart_contents[ $cart_item_key ]['data'] = $variation;
+								
+								// Log the selected attributes
+								$attribute_string = '';
+								foreach ( $variation_attributes as $attr_name => $attr_value ) {
+									if ( ! empty( $attr_value ) ) {
+										$taxonomy = str_replace( 'attribute_', '', $attr_name );
+										$term = get_term_by( 'slug', $attr_value, $taxonomy );
+										$label = $term ? $term->name : $attr_value;
+										$attribute_string .= ucfirst( str_replace( 'pa_', '', $taxonomy ) ) . ': ' . $label . ', ';
+									}
+								}
+								$attribute_string = rtrim( $attribute_string, ', ' );
+								
 								self::log_message( 'success', sprintf( 
-									__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ), 
-									$child_product->get_name(), 
-									$child_id,
-									$product_id 
+									__( 'Added variable product to cart: %s (ID: %d, Variation ID: %d) - %s', 'wc-sc-debugger' ), 
+									$product->get_name(), 
+									$product_id, 
+									$variation_id,
+									$attribute_string
 								) );
 								return true;
 							}
 						}
 					}
-				}
-				
-				self::log_message( 'warning', sprintf( __( 'No purchasable child products found for grouped product ID %d.', 'wc-sc-debugger' ), $product_id ) );
-				return false;
-				
-			} else {
-				// Handle simple products and other types
-				if ( $product->is_purchasable() && $product->is_in_stock() ) {
-					$cart_item_key = WC()->cart->add_to_cart( $product_id, 1 );
-					if ( $cart_item_key ) {
-						self::log_message( 'success', sprintf( 
-							__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), 
-							$product->get_name(), 
-							$product_id 
-						) );
-						return true;
+					
+					self::log_message( 'warning', sprintf( __( 'No purchasable variations in stock for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+					return false;
+					
+				} elseif ( $product->is_type( 'grouped' ) ) {
+					// Handle grouped products
+					self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a grouped product. Adding first available child product...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+					
+					$children = $product->get_children();
+					if ( ! empty( $children ) ) {
+						foreach ( $children as $child_id ) {
+							$child_product = wc_get_product( $child_id );
+							if ( $child_product && $child_product->is_purchasable() && $child_product->is_in_stock() ) {
+								$cart_item_data = array();
+								$cart_item_key = WC()->cart->add_to_cart( $child_id, 1, 0, array(), $cart_item_data );
+								if ( $cart_item_key ) {
+									// Ensure cart item data is properly structured
+									WC()->cart->cart_contents[ $cart_item_key ]['data'] = $child_product;
+									
+									self::log_message( 'success', sprintf( 
+										__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ), 
+										$child_product->get_name(), 
+										$child_id,
+										$product_id 
+									) );
+									return true;
+								}
+							}
+						}
+					}
+					
+					self::log_message( 'warning', sprintf( __( 'No purchasable child products found for grouped product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+					return false;
+					
+				} else {
+					// Handle simple products and other types
+					if ( $product->is_purchasable() && $product->is_in_stock() ) {
+						$cart_item_data = array();
+						$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, 0, array(), $cart_item_data );
+						if ( $cart_item_key ) {
+							// Ensure cart item data is properly structured
+							WC()->cart->cart_contents[ $cart_item_key ]['data'] = $product;
+							
+							self::log_message( 'success', sprintf( 
+								__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), 
+								$product->get_name(), 
+								$product_id 
+							) );
+							return true;
+						} else {
+							self::log_message( 'warning', sprintf( __( 'Failed to add product ID %d to cart.', 'wc-sc-debugger' ), $product_id ) );
+							return false;
+						}
 					} else {
-						self::log_message( 'warning', sprintf( __( 'Failed to add product ID %d to cart.', 'wc-sc-debugger' ), $product_id ) );
+						$reasons = array();
+						if ( ! $product->is_purchasable() ) {
+							$reasons[] = __( 'not purchasable', 'wc-sc-debugger' );
+						}
+						if ( ! $product->is_in_stock() ) {
+							$reasons[] = __( 'out of stock', 'wc-sc-debugger' );
+						}
+						self::log_message( 'warning', sprintf( 
+							__( 'Product ID %d cannot be added to cart: %s.', 'wc-sc-debugger' ), 
+							$product_id,
+							implode( ', ', $reasons )
+						) );
 						return false;
 					}
-				} else {
-					$reasons = array();
-					if ( ! $product->is_purchasable() ) {
-						$reasons[] = __( 'not purchasable', 'wc-sc-debugger' );
-					}
-					if ( ! $product->is_in_stock() ) {
-						$reasons[] = __( 'out of stock', 'wc-sc-debugger' );
-					}
-					self::log_message( 'warning', sprintf( 
-						__( 'Product ID %d cannot be added to cart: %s.', 'wc-sc-debugger' ), 
-						$product_id,
-						implode( ', ', $reasons )
-					) );
-					return false;
 				}
+			} catch ( Exception $e ) {
+				self::log_message( 'error', sprintf( 
+					__( 'Error adding product to cart: %s', 'wc-sc-debugger' ), 
+					$e->getMessage() 
+				) );
+				return false;
 			}
 		}
 
