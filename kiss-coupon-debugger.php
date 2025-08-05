@@ -3,7 +3,7 @@
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.4.1
+ * Version:     1.4.2
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
  * License:     GPL-3.0+
@@ -242,7 +242,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.4.1',
+				'1.4.2',
 				true
 			);
 
@@ -260,7 +260,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
-				'1.4.1'
+				'1.4.2'
 			);
 		}
 
@@ -715,6 +715,9 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				$this->hooks_tracking_active = true;
 			}
 
+			// Add filter to prevent Smart Coupons from modifying items during our test
+			add_filter( 'woocommerce_coupon_get_items_to_validate', array( $this, 'ensure_valid_cart_items' ), 1, 2 );
+
 			try {
 				// Clear the current cart and session for a clean test
 				WC()->cart->empty_cart( true );
@@ -787,6 +790,72 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				} else {
 					WC()->cart->calculate_totals();
 					$cart_total = WC()->cart->get_total( 'edit' );
+					$discount_total = WC()->cart->get_discount_total();
+					self::log_message( 'success', __( 'Coupon applied successfully!', 'wc-sc-debugger' ) );
+					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'wc-sc-debugger' ), wc_price( $cart_total ) ) );
+					self::log_message( 'success', sprintf( __( 'Discount Amount: %s', 'wc-sc-debugger' ), wc_price( $discount_total ) ) );
+					$result = true;
+				}
+
+			} catch ( Exception $e ) {
+				self::log_message( 'error', sprintf( __( 'Exception during coupon test: %s', 'wc-sc-debugger' ), $e->getMessage() ) );
+				$result = new WP_Error( 'test_exception', $e->getMessage() );
+			}
+
+			// Remove our filter
+			remove_filter( 'woocommerce_coupon_get_items_to_validate', array( $this, 'ensure_valid_cart_items' ), 1 );
+
+			// Restore original state
+			$this->restore_cart_state( $original_cart_contents, $original_applied_coupons, $original_session_data, $original_notices, $original_user_id );
+
+			return $result;
+		}
+
+		/**
+		 * Ensure cart items are properly structured for validation
+		 *
+		 * @param array $items Cart items
+		 * @param WC_Coupon $coupon Coupon object
+		 * @return array
+		 */
+		public function ensure_valid_cart_items( $items, $coupon ) {
+			if ( ! is_array( $items ) ) {
+				return $items;
+			}
+
+			foreach ( $items as $key => $item ) {
+				// Ensure each item has proper structure
+				if ( ! is_array( $item ) ) {
+					unset( $items[ $key ] );
+					continue;
+				}
+
+				// Ensure data property exists and is an object
+				if ( ! isset( $item['data'] ) || ! is_object( $item['data'] ) ) {
+					if ( isset( $item['product_id'] ) ) {
+						$product_id = isset( $item['variation_id'] ) && $item['variation_id'] ? $item['variation_id'] : $item['product_id'];
+						$product = wc_get_product( $product_id );
+						if ( $product ) {
+							$items[ $key ]['data'] = $product;
+						} else {
+							unset( $items[ $key ] );
+						}
+					} else {
+						unset( $items[ $key ] );
+					}
+				}
+
+				// Ensure quantity is numeric
+				if ( isset( $item['quantity'] ) && ! is_numeric( $item['quantity'] ) ) {
+					$items[ $key ]['quantity'] = 1;
+				}
+			}
+
+			return array_values( $items ); // Re-index array
+		}
+
+		/**
+		 * Restore cart state after testing' );
 					$discount_total = WC()->cart->get_discount_total();
 					self::log_message( 'success', sprintf( __( 'Coupon applied successfully!', 'wc-sc-debugger' ) ) );
 					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'wc-sc-debugger' ), wc_price( $cart_total ) ) );
@@ -912,20 +981,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 								}
 							}
 							
-							// Add variation to cart with explicit parameters
-							$cart_item_data = array();
-							$cart_item_key = WC()->cart->add_to_cart( 
-								$product_id, 
-								1, 
-								$variation_id, 
-								$variation_attributes, 
-								$cart_item_data 
-							);
+							// Add variation to cart - let WooCommerce handle the data structure
+							$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, $variation_id, $variation_attributes );
 							
 							if ( $cart_item_key ) {
-								// Ensure cart item data is properly structured
-								WC()->cart->cart_contents[ $cart_item_key ]['data'] = $variation;
-								
 								// Log the selected attributes
 								$attribute_string = '';
 								foreach ( $variation_attributes as $attr_name => $attr_value ) {
@@ -962,12 +1021,8 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 						foreach ( $children as $child_id ) {
 							$child_product = wc_get_product( $child_id );
 							if ( $child_product && $child_product->is_purchasable() && $child_product->is_in_stock() ) {
-								$cart_item_data = array();
-								$cart_item_key = WC()->cart->add_to_cart( $child_id, 1, 0, array(), $cart_item_data );
+								$cart_item_key = WC()->cart->add_to_cart( $child_id );
 								if ( $cart_item_key ) {
-									// Ensure cart item data is properly structured
-									WC()->cart->cart_contents[ $cart_item_key ]['data'] = $child_product;
-									
 									self::log_message( 'success', sprintf( 
 										__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ), 
 										$child_product->get_name(), 
@@ -986,12 +1041,8 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				} else {
 					// Handle simple products and other types
 					if ( $product->is_purchasable() && $product->is_in_stock() ) {
-						$cart_item_data = array();
-						$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, 0, array(), $cart_item_data );
+						$cart_item_key = WC()->cart->add_to_cart( $product_id );
 						if ( $cart_item_key ) {
-							// Ensure cart item data is properly structured
-							WC()->cart->cart_contents[ $cart_item_key ]['data'] = $product;
-							
 							self::log_message( 'success', sprintf( 
 								__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), 
 								$product->get_name(), 
