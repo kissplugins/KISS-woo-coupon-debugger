@@ -3,7 +3,7 @@
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.4.2
+ * Version:     1.4.4
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
  * License:     GPL-3.0+
@@ -771,7 +771,16 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 
 				// Apply the coupon
 				$coupon_applied = false;
+				
+				// Clear any existing notices before applying
+				wc_clear_notices();
+				
 				$coupon_applied = WC()->cart->apply_coupon( $coupon_code );
+				
+				// Force a recalculation after applying the coupon
+				if ( $coupon_applied && ! is_wp_error( $coupon_applied ) ) {
+					WC()->cart->calculate_totals();
+				}
 
 				if ( is_wp_error( $coupon_applied ) ) {
 					self::log_message( 'error', sprintf( __( 'Failed to apply coupon: %s', 'wc-sc-debugger' ), $coupon_applied->get_error_message() ) );
@@ -788,12 +797,48 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					self::log_message( 'error', __( 'Coupon could not be applied. Check coupon validity and restrictions.', 'wc-sc-debugger' ) );
 					$result = false;
 				} else {
+					// First calculate totals to ensure coupon is processed
 					WC()->cart->calculate_totals();
+					
+					// Get the discount details
 					$cart_total = WC()->cart->get_total( 'edit' );
+					$subtotal = WC()->cart->get_subtotal();
 					$discount_total = WC()->cart->get_discount_total();
+					$discount_tax = WC()->cart->get_discount_tax();
+					
 					self::log_message( 'success', __( 'Coupon applied successfully!', 'wc-sc-debugger' ) );
+					self::log_message( 'info', sprintf( __( 'Cart Subtotal: %s', 'wc-sc-debugger' ), wc_price( $subtotal ) ) );
 					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'wc-sc-debugger' ), wc_price( $cart_total ) ) );
-					self::log_message( 'success', sprintf( __( 'Discount Amount: %s', 'wc-sc-debugger' ), wc_price( $discount_total ) ) );
+					self::log_message( 'success', sprintf( __( 'Total Discount Amount: %s (excl. tax)', 'wc-sc-debugger' ), wc_price( $discount_total ) ) );
+					
+					if ( $discount_tax > 0 ) {
+						self::log_message( 'info', sprintf( __( 'Discount Tax: %s', 'wc-sc-debugger' ), wc_price( $discount_tax ) ) );
+						self::log_message( 'info', sprintf( __( 'Total Discount (incl. tax): %s', 'wc-sc-debugger' ), wc_price( $discount_total + $discount_tax ) ) );
+					}
+					
+					// Get applied coupons
+					$applied_coupons = WC()->cart->get_applied_coupons();
+					if ( ! empty( $applied_coupons ) ) {
+						self::log_message( 'info', sprintf( __( 'Applied Coupons: %s', 'wc-sc-debugger' ), implode( ', ', $applied_coupons ) ) );
+					}
+					
+					// Additional debug info for the specific coupon
+					$coupon_obj = new WC_Coupon( $coupon_code );
+					if ( $coupon_obj->get_id() ) {
+						self::log_message( 'info', sprintf( 
+							__( 'Coupon Type: %s, Amount: %s%s', 'wc-sc-debugger' ), 
+							$coupon_obj->get_discount_type(),
+							$coupon_obj->get_amount(),
+							$coupon_obj->is_type( 'percent' ) ? '%' : ''
+						) );
+						
+						// Check if this is a Smart Coupon
+						$is_smart_coupon = get_post_meta( $coupon_obj->get_id(), 'is_smart_coupon', true );
+						if ( $is_smart_coupon === 'yes' ) {
+							self::log_message( 'info', __( 'This is a Smart Coupon', 'wc-sc-debugger' ) );
+						}
+					}
+					
 					$result = true;
 				}
 
@@ -889,26 +934,40 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			$this->hooks_tracking_active = false;
 
 			try {
-				// Clear cart
+				// Clear cart completely
 				WC()->cart->empty_cart( true );
+				
+				// Remove all coupons first
+				$current_coupons = WC()->cart->get_applied_coupons();
+				foreach ( $current_coupons as $code ) {
+					WC()->cart->remove_coupon( $code );
+				}
 
-				// Restore cart contents
-				foreach ( $original_cart_contents as $cart_item_key => $cart_item ) {
-					$product_id = isset( $cart_item['product_id'] ) ? $cart_item['product_id'] : 0;
-					$quantity = isset( $cart_item['quantity'] ) ? $cart_item['quantity'] : 1;
-					$variation_id = isset( $cart_item['variation_id'] ) ? $cart_item['variation_id'] : 0;
-					$variation = isset( $cart_item['variation'] ) && is_array( $cart_item['variation'] ) ? $cart_item['variation'] : array();
-					$cart_item_data = isset( $cart_item['data'] ) && is_array( $cart_item['data'] ) ? $cart_item['data'] : array();
-					
-					// Ensure we have a valid product ID
-					if ( $product_id ) {
-						WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation, $cart_item_data );
+				// Restore cart contents without triggering Smart Coupons issues
+				if ( ! empty( $original_cart_contents ) ) {
+					foreach ( $original_cart_contents as $cart_item_key => $cart_item ) {
+						$product_id = isset( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
+						$quantity = isset( $cart_item['quantity'] ) ? absint( $cart_item['quantity'] ) : 1;
+						$variation_id = isset( $cart_item['variation_id'] ) ? absint( $cart_item['variation_id'] ) : 0;
+						$variation = isset( $cart_item['variation'] ) && is_array( $cart_item['variation'] ) ? $cart_item['variation'] : array();
+						
+						// Skip if no valid product ID
+						if ( ! $product_id ) {
+							continue;
+						}
+						
+						// Use simple add_to_cart without extra data
+						WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation );
 					}
 				}
 
 				// Restore session data
 				if ( WC()->session && ! empty( $original_session_data ) ) {
 					foreach ( $original_session_data as $key => $value ) {
+						// Skip cart-related session data as we're rebuilding it
+						if ( in_array( $key, array( 'cart', 'cart_totals', 'applied_coupons', 'coupon_discount_amounts', 'coupon_discount_tax_amounts', 'removed_cart_contents' ) ) ) {
+							continue;
+						}
 						WC()->session->set( $key, $value );
 					}
 				}
@@ -918,16 +977,21 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					WC()->session->set( 'wc_notices', $original_notices );
 				}
 
-				// Restore applied coupons
-				foreach ( $original_applied_coupons as $coupon_code ) {
-					WC()->cart->apply_coupon( $coupon_code );
-				}
-
 				// Restore user
 				wp_set_current_user( $original_user_id );
 
-				// Recalculate totals
+				// Calculate totals before re-applying coupons
 				WC()->cart->calculate_totals();
+
+				// Restore applied coupons one by one
+				if ( ! empty( $original_applied_coupons ) ) {
+					foreach ( $original_applied_coupons as $coupon_code ) {
+						// Silently apply coupons without triggering errors
+						@WC()->cart->apply_coupon( $coupon_code );
+					}
+					// Final calculation after all coupons are applied
+					WC()->cart->calculate_totals();
+				}
 
 			} catch ( Exception $e ) {
 				error_log( 'WC SC Debugger: Failed to restore cart state - ' . $e->getMessage() );
