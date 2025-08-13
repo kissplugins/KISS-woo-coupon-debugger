@@ -29,10 +29,16 @@ define( 'WC_SC_DEBUGGER_PLUGIN_FILE', __FILE__ );
 define( 'WC_SC_DEBUGGER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WC_SC_DEBUGGER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// Load the autoloader
-require_once WC_SC_DEBUGGER_PLUGIN_DIR . 'src/Autoloader.php';
+// Load autoloader: prefer Composer, fallback to plugin autoloader
+$composerAutoload = WC_SC_DEBUGGER_PLUGIN_DIR . 'vendor/autoload.php';
+if ( file_exists( $composerAutoload ) ) {
+	require_once $composerAutoload;
+} else {
+	require_once WC_SC_DEBUGGER_PLUGIN_DIR . 'src/Autoloader.php';
+	\KissPlugins\WooCouponDebugger\Autoloader::register();
+	\KissPlugins\WooCouponDebugger\Autoloader::addNamespace( 'KissPlugins\\WooCouponDebugger\\', WC_SC_DEBUGGER_PLUGIN_DIR . 'src/' );
+}
 
-use KissPlugins\WooCouponDebugger\Autoloader;
 use KissPlugins\WooCouponDebugger\Container\Container;
 use KissPlugins\WooCouponDebugger\Core\DebuggerCore;
 use KissPlugins\WooCouponDebugger\Core\Logger;
@@ -46,10 +52,6 @@ use KissPlugins\WooCouponDebugger\Interfaces\HookTrackerInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\CartSimulatorInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\ContainerInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\SettingsRepositoryInterface;
-
-// Register autoloader
-Autoloader::register();
-Autoloader::addNamespace( 'KissPlugins\\WooCouponDebugger\\', WC_SC_DEBUGGER_PLUGIN_DIR . 'src/' );
 
 /**
  * Main plugin class using new architecture

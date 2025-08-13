@@ -79,7 +79,8 @@ class AjaxHandler {
             $result = $this->testCouponSafely(
                 $input['coupon_code'],
                 $input['product_ids'],
-                $input['user_id']
+                $input['user_id'],
+                !empty($input['skip_smart_coupons'])
             );
 
             // Prepare response
@@ -202,7 +203,7 @@ class AjaxHandler {
      * @param int    $user_id     User ID to simulate
      * @return bool|\WP_Error True if coupon applied successfully, WP_Error on failure
      */
-    private function testCouponSafely(string $coupon_code, array $product_ids, int $user_id) {
+    private function testCouponSafely(string $coupon_code, array $product_ids, int $user_id, bool $skipSmartCoupons) {
         // Set up error handler to catch Smart Coupons errors
         $previous_error_handler = set_error_handler(function($severity, $message, $file, $line) {
             // Check if this is a Smart Coupons related error
@@ -225,7 +226,7 @@ class AjaxHandler {
         try {
             // Attempt to test the coupon
             $result = $this->debugger->testCoupon($coupon_code, $product_ids, $user_id, [
-                'skip_smart_coupons' => !empty($input['skip_smart_coupons']),
+                'skip_smart_coupons' => $skipSmartCoupons,
             ]);
 
             // Restore previous error handler
