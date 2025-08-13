@@ -2,7 +2,13 @@
 
 This document outlines planned features and improvements for future versions of the KISS Woo Coupon Debugger plugin.
 
-## Enhanced Testing Capabilities
+Aug. 12 2025 
+
+Immediate (Phase 1): Focus on architectural refactoring and testing infrastructure
+
+Medium-term (Phase 2): Enhance user experience and debugging capabilities
+
+## Phase 3 - Enhanced Testing Capabilities
 
 ### Bulk Testing Mode
 - **Feature**: Test multiple coupons at once
