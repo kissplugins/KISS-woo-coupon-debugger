@@ -116,37 +116,9 @@ class WC_SC_Debugger {
 	 */
 	private function setupContainer(): void {
 		$this->container = new Container();
-
-		// Bind interfaces to implementations
-		$this->container->singleton( LoggerInterface::class, Logger::class );
-		$this->container->singleton( HookTrackerInterface::class, function( $container ) {
-			return new HookTracker( $container->get( LoggerInterface::class ) );
-		});
-		$this->container->singleton( CartSimulatorInterface::class, function( $container ) {
-			return new CartSimulator( $container->get( LoggerInterface::class ) );
-		});
-		$this->container->singleton( DebuggerInterface::class, function( $container ) {
-			return new DebuggerCore(
-				$container->get( LoggerInterface::class ),
-				$container->get( HookTrackerInterface::class ),
-				$container->get( CartSimulatorInterface::class )
-			);
-		});
-
-		$this->container->singleton( SettingsRepositoryInterface::class, function() {
-			return new \KissPlugins\WooCouponDebugger\Settings\SettingsRepository();
-		});
-
-		// Bind concrete classes
-		$this->container->singleton( AdminInterface::class, function() {
-			return new AdminInterface( WC_SC_DEBUGGER_VERSION );
-		});
-		$this->container->singleton( AjaxHandler::class, function( $container ) {
-			return new AjaxHandler(
-				$container->get( DebuggerInterface::class ),
-				$container->get( SettingsRepositoryInterface::class )
-			);
-		});
+		// Delegate bindings to ServiceProvider
+		( new \KissPlugins\WooCouponDebugger\Bootstrap\ServiceProvider( WC_SC_DEBUGGER_VERSION ) )
+			->register( $this->container );
 	}
 
 	/**
