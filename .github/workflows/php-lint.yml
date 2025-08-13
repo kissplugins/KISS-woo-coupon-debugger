@@ -45,9 +45,20 @@ jobs:
           done
           exit $fail
 
-      # Uncomment to run static analysis or coding standards
-      # - name: PHPStan
-      #   run: composer phpstan
-      # - name: PHPCS
-      #   run: composer phpcs
+      - name: PHPStan (static analysis)
+        run: composer phpstan
+
+      - name: PHPCS (coding standards)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checking installed PHPCS standards:"
+          vendor/bin/phpcs -i || true
+          if vendor/bin/phpcs -i | grep -q "WordPress"; then
+            echo "WordPress standard found. Running PHPCS with WordPress standard."
+            composer phpcs
+          else
+            echo "WordPress standard not found. Skipping PHPCS."
+            echo "To enable WordPress standard, add dev dependency: wp-coding-standards/wpcs and dealerdirect/phpcodesniffer-composer-installer."
+          fi
 
