@@ -32,6 +32,16 @@ The KISS Woo Coupon Debugger is a powerful development tool designed to help Woo
 3. Activate the plugin through the 'Plugins' menu in WordPress
 4. Navigate to WooCommerce → SC Debugger to start debugging
 
+## Continuous Integration (CI)
+
+We run automated checks on every push/PR using GitHub Actions:
+- PHP syntax linting (php -l)
+- Static analysis with PHPStan
+- WordPress coding standards via PHPCS (WPCS)
+
+See CI.md for details on what runs, how to run these checks locally, and tips for interpreting results.
+
+
 ## Usage
 
 ### Basic Debugging
