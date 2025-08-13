@@ -181,4 +181,7 @@ Developed by [KISS Plugins](https://kissplugins.com)
 
 ## Disclaimer
 
-This plugin is intended for debugging and development purposes. Always test in a staging environment before using on a production site. The authors are not responsible for any data loss or issues that may occur from using this plugin.
+
+This plugin is intended for debugging and development purposes. 
+Always test in a staging environment before using on a production site. 
+The authors are not responsible for any data loss or issues that may occur from using this plugin.

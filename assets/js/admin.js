@@ -76,7 +76,44 @@ jQuery(document).ready(function($) {
             error: function(jqXHR, textStatus, errorThrown) {
                 $loadingIndicator.hide();
                 $runDebugButton.prop('disabled', false);
-                $debugResults.append('<div class="debug-message error">AJAX Error: ' + textStatus + ' - ' + errorThrown + '</div>');
+
+                var message = 'AJAX Error: ' + textStatus;
+                if (errorThrown) {
+                    message += ' - ' + errorThrown;
+                }
+                message += '<br>Status: ' + jqXHR.status + ' (' + jqXHR.statusText + ')';
+
+                var responseDetail = '';
+                if (jqXHR.responseJSON) {
+                    if (jqXHR.responseJSON.message) {
+                        responseDetail = jqXHR.responseJSON.message;
+                    }
+                    if (jqXHR.responseJSON.data) {
+                        if (jqXHR.responseJSON.data.message) {
+                            responseDetail += (responseDetail ? '\n' : '') + jqXHR.responseJSON.data.message;
+                        }
+                        if (jqXHR.responseJSON.data.debug_info) {
+                            responseDetail += (responseDetail ? '\n' : '') + 'Debug Info: ' + jqXHR.responseJSON.data.debug_info;
+                        }
+                    }
+                } else if (jqXHR.responseText) {
+                    responseDetail = jqXHR.responseText;
+                }
+
+                if (responseDetail) {
+                    var safeResponse = $('<div/>').text(responseDetail).html();
+                    message += '<br>Response:<pre>' + safeResponse + '</pre>';
+                }
+
+                $debugResults.append('<div class="debug-message error">' + message + '</div>');
+
+                console.error('AJAX request failed', {
+                    textStatus: textStatus,
+                    errorThrown: errorThrown,
+                    status: jqXHR.status,
+                    statusText: jqXHR.statusText,
+                    responseText: jqXHR.responseText
+                });
             }
         });
     });
