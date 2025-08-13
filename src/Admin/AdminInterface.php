@@ -154,13 +154,6 @@ class AdminInterface {
         $product_id = isset($options['product_id_' . $args['field_id']]['id']) ? $options['product_id_' . $args['field_id']]['id'] : '';
         $product_name = isset($options['product_id_' . $args['field_id']]['name']) ? $options['product_id_' . $args['field_id']]['name'] : '';
         $validation_message = isset($options['product_id_' . $args['field_id']]['message']) ? $options['product_id_' . $args['field_id']]['message'] : '';
-    /**
-     * Render checkbox to skip Smart Coupons
-     */
-    public function skipSmartCouponsFieldCallback(): void {
-        $val = (int) get_option('wc_sc_debugger_skip_smart_coupons', 0);
-        echo '<label><input type="checkbox" id="wc_sc_debugger_skip_smart_coupons" name="wc_sc_debugger_skip_smart_coupons" value="1" ' . checked(1, $val, false) . ' /> ' . esc_html__('If Smart Coupons throws PHP 8+ errors, skip its stack and simulate discount heuristically.', 'wc-sc-debugger') . '</label>';
-    }
 
         $validation_type = isset($options['product_id_' . $args['field_id']]['type']) ? $options['product_id_' . $args['field_id']]['type'] : '';
 
@@ -195,7 +188,6 @@ class AdminInterface {
             $product_name = '';
             $message = '';
             $type = '';
-
             if ($id > 0) {
                 $product = wc_get_product($id);
                 if ($product && $product->exists()) {
@@ -230,7 +222,7 @@ class AdminInterface {
      */
     public function enqueueAdminScripts(string $hook): void {
         // Enqueue changelog scripts on plugins page
-        global $pagenow;
+            global $pagenow;
         if ('plugins.php' === $pagenow) {
             $this->enqueueChangelogScripts();
             return;
@@ -286,6 +278,7 @@ class AdminInterface {
         wp_localize_script(
             'wc-sc-debugger-changelog',
             'wcSCDebuggerChangelog',
+
             [
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'strings' => [
@@ -454,4 +447,12 @@ class AdminInterface {
 
         wp_send_json_success(['html' => $html]);
     }
+    /**
+     * Render checkbox to skip Smart Coupons (standalone method)
+     */
+    public function skipSmartCouponsFieldCallback(): void {
+        $val = (int) get_option('wc_sc_debugger_skip_smart_coupons', 0);
+        echo '<label><input type="checkbox" id="wc_sc_debugger_skip_smart_coupons" name="wc_sc_debugger_skip_smart_coupons" value="1" ' . checked(1, $val, false) . ' /> ' . esc_html__('If Smart Coupons throws PHP 8+ errors, skip its stack and simulate discount heuristically.', 'wc-sc-debugger') . '</label>';
+    }
+
 }
