@@ -7,10 +7,12 @@
 
 namespace KissPlugins\WooCouponDebugger\Admin;
 
+use KissPlugins\WooCouponDebugger\Interfaces\AdminInterface as AdminContract;
+
 /**
  * Handles admin interface and pages
  */
-class AdminUI {
+class AdminUI implements AdminContract {
 
     /**
      * Plugin version

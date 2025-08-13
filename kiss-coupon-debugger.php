@@ -44,6 +44,7 @@ use KissPlugins\WooCouponDebugger\Core\DebuggerCore;
 use KissPlugins\WooCouponDebugger\Core\Logger;
 use KissPlugins\WooCouponDebugger\Hooks\HookTracker;
 use KissPlugins\WooCouponDebugger\Cart\CartSimulator;
+use KissPlugins\WooCouponDebugger\Interfaces\AdminInterface as AdminContract;
 use KissPlugins\WooCouponDebugger\Admin\AdminUI;
 use KissPlugins\WooCouponDebugger\Ajax\AjaxHandler;
 use KissPlugins\WooCouponDebugger\Interfaces\LoggerInterface;
@@ -128,7 +129,7 @@ class WC_SC_Debugger {
 	 * @return void
 	 */
 	private function initializeComponents(): void {
-		$this->adminUI = $this->container->get( AdminUI::class );
+		$this->adminUI = $this->container->get( AdminContract::class );
 		$this->ajaxHandler = $this->container->get( AjaxHandler::class );
 	}
 

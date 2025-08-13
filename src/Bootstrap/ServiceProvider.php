@@ -18,6 +18,7 @@ use KissPlugins\WooCouponDebugger\Core\DebuggerCore;
 use KissPlugins\WooCouponDebugger\Hooks\HookTracker;
 use KissPlugins\WooCouponDebugger\Cart\CartSimulator;
 use KissPlugins\WooCouponDebugger\Settings\SettingsRepository;
+use KissPlugins\WooCouponDebugger\Interfaces\AdminInterface as AdminContract;
 use KissPlugins\WooCouponDebugger\Admin\AdminUI;
 use KissPlugins\WooCouponDebugger\Ajax\AjaxHandler;
 
@@ -54,7 +55,7 @@ class ServiceProvider {
         });
 
         // Concrete classes
-        $container->singleton(AdminUI::class, function () {
+        $container->singleton(AdminContract::class, function () {
             return new AdminUI($this->version);
         });
 
