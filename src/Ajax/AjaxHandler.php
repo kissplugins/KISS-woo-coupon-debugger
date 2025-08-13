@@ -95,7 +95,7 @@ class AjaxHandler {
 
             wp_send_json_success($response);
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             error_log('WC SC Debugger AJAX Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
 
             // Check if this is a Smart Coupons compatibility issue
@@ -221,6 +221,22 @@ class AjaxHandler {
             restore_error_handler();
 
             return $result;
+
+        } catch (\TypeError $e) {
+            // Restore previous error handler
+            restore_error_handler();
+
+            // Detect known Smart Coupons PHP 8+ TypeError and return a friendly WP_Error
+            if (strpos($e->getMessage(), 'Cannot access offset of type string on string') !== false) {
+                $this->addSmartCouponsErrorMessages();
+                return new \WP_Error(
+                    'smart_coupons_compatibility',
+                    __('Smart Coupons PHP 8+ compatibility issue. Please see debug output for details.', 'wc-sc-debugger')
+                );
+            }
+
+            // Unknown TypeError; rethrow
+            throw $e;
 
         } catch (\ErrorException $e) {
             // Restore previous error handler

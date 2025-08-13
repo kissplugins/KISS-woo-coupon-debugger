@@ -205,7 +205,7 @@ class DebuggerCore implements DebuggerInterface {
             // Apply the coupon with Smart Coupons error handling
             try {
                 $coupon_applied = WC()->cart->apply_coupon($coupon_code);
-            } catch (TypeError $e) {
+            } catch (\TypeError $e) {
                 // Handle Smart Coupons PHP 8+ compatibility errors
                 if (strpos($e->getMessage(), 'Cannot access offset of type string on string') !== false) {
                     $this->logger->log('error', sprintf(
