@@ -10,7 +10,7 @@ namespace KissPlugins\WooCouponDebugger\Admin;
 /**
  * Handles admin interface and pages
  */
-class AdminInterface {
+class AdminUI {
 
     /**
      * Plugin version

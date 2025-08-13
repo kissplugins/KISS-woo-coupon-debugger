@@ -44,7 +44,7 @@ use KissPlugins\WooCouponDebugger\Core\DebuggerCore;
 use KissPlugins\WooCouponDebugger\Core\Logger;
 use KissPlugins\WooCouponDebugger\Hooks\HookTracker;
 use KissPlugins\WooCouponDebugger\Cart\CartSimulator;
-use KissPlugins\WooCouponDebugger\Admin\AdminInterface;
+use KissPlugins\WooCouponDebugger\Admin\AdminUI;
 use KissPlugins\WooCouponDebugger\Ajax\AjaxHandler;
 use KissPlugins\WooCouponDebugger\Interfaces\LoggerInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\DebuggerInterface;
@@ -79,7 +79,8 @@ class WC_SC_Debugger {
 	 *
 	 * @var AdminInterface
 	 */
-	private $adminInterface;
+	private $adminInterface; // deprecated name
+	private $adminUI;
 
 	/**
 	 * AJAX handler instance
@@ -127,7 +128,7 @@ class WC_SC_Debugger {
 	 * @return void
 	 */
 	private function initializeComponents(): void {
-		$this->adminInterface = $this->container->get( AdminInterface::class );
+		$this->adminUI = $this->container->get( AdminUI::class );
 		$this->ajaxHandler = $this->container->get( AjaxHandler::class );
 	}
 
@@ -137,8 +138,8 @@ class WC_SC_Debugger {
 	 * @return void
 	 */
 	private function setupHooks(): void {
-		// Initialize admin interface
-		$this->adminInterface->init();
+		// Initialize admin UI
+		$this->adminUI->init();
 
 		// Initialize AJAX handler
 		$this->ajaxHandler->init();
