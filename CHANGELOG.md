@@ -5,6 +5,15 @@ All notable changes to the KISS Woo Coupon Debugger plugin will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-08-13
+
+### Phase 2 (1.5b): Smart Coupons Resilience and Simulation
+- Added setting: "Skip Smart Coupons stack (simulate)" to avoid PHP 8+ fatals originating from Smart Coupons
+- Heuristic simulation mode estimates discount and continues validating other constraints when Smart Coupons throws TypeError
+- Hardened AJAX and core error handling to catch Throwable and TypeError without 500s
+- Improved debug messages to clearly call out Smart Coupons compatibility issues
+- Major refactor completed; bumping to v2.0.0 series. v1.x kept as legacy non-PSR-4 branch (v1.x-stable)
+
 ## [1.4.0] - 2025-08-13
 
 ### 🚀 Major Architecture Refactoring (Phase 1 Priority 1)

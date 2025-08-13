@@ -152,8 +152,8 @@ class AjaxHandler {
         }
 
         // Verify WooCommerce components
-        if (!function_exists('WC') || 
-            !isset(WC()->cart) || !is_object(WC()->cart) || 
+        if (!function_exists('WC') ||
+            !isset(WC()->cart) || !is_object(WC()->cart) ||
             !isset(WC()->session) || !is_object(WC()->session)) {
             throw new Exception(__('WooCommerce cart or session is not fully loaded. Please ensure WooCommerce is active and properly initialized.', 'wc-sc-debugger'));
         }
@@ -182,6 +182,7 @@ class AjaxHandler {
             'coupon_code' => $coupon_code,
             'product_ids' => $product_ids,
             'user_id' => $user_id,
+            'skip_smart_coupons' => isset($_POST['skip_smart_coupons']) ? (bool) absint(wp_unslash($_POST['skip_smart_coupons'])) : (bool) get_option('wc_sc_debugger_skip_smart_coupons', 0),
         ];
     }
 
@@ -215,7 +216,9 @@ class AjaxHandler {
 
         try {
             // Attempt to test the coupon
-            $result = $this->debugger->testCoupon($coupon_code, $product_ids, $user_id);
+            $result = $this->debugger->testCoupon($coupon_code, $product_ids, $user_id, [
+                'skip_smart_coupons' => !empty($input['skip_smart_coupons']),
+            ]);
 
             // Restore previous error handler
             restore_error_handler();

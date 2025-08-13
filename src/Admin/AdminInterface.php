@@ -90,11 +90,33 @@ class AdminInterface {
             [$this, 'sanitizeValidatedProducts']
         );
 
+        register_setting(
+            'wc_sc_debugger_options_group',
+            'wc_sc_debugger_skip_smart_coupons',
+            function($val){ return (int) (bool) $val; }
+        );
+
         add_settings_section(
             'wc_sc_debugger_products_section',
             __('Pre-define Products for Testing', 'wc-sc-debugger'),
             [$this, 'productsSectionCallback'],
             'wc-sc-debugger-settings'
+        );
+
+        add_settings_section(
+            'wc_sc_debugger_behavior_section',
+            __('Behavior', 'wc-sc-debugger'),
+            function(){ echo '<p>' . esc_html__('Control how the debugger behaves around known third-party issues.', 'wc-sc-debugger') . '</p>'; },
+            'wc-sc-debugger-settings'
+        );
+
+        add_settings_field(
+            'wc_sc_debugger_skip_smart_coupons',
+            __('Skip Smart Coupons stack (simulate)', 'wc-sc-debugger'),
+            [$this, 'skipSmartCouponsFieldCallback'],
+            'wc-sc-debugger-settings',
+            'wc_sc_debugger_behavior_section',
+            [ 'label_for' => 'wc_sc_debugger_skip_smart_coupons' ]
         );
 
         for ($i = 1; $i <= 3; $i++) {
@@ -132,6 +154,14 @@ class AdminInterface {
         $product_id = isset($options['product_id_' . $args['field_id']]['id']) ? $options['product_id_' . $args['field_id']]['id'] : '';
         $product_name = isset($options['product_id_' . $args['field_id']]['name']) ? $options['product_id_' . $args['field_id']]['name'] : '';
         $validation_message = isset($options['product_id_' . $args['field_id']]['message']) ? $options['product_id_' . $args['field_id']]['message'] : '';
+    /**
+     * Render checkbox to skip Smart Coupons
+     */
+    public function skipSmartCouponsFieldCallback(): void {
+        $val = (int) get_option('wc_sc_debugger_skip_smart_coupons', 0);
+        echo '<label><input type="checkbox" id="wc_sc_debugger_skip_smart_coupons" name="wc_sc_debugger_skip_smart_coupons" value="1" ' . checked(1, $val, false) . ' /> ' . esc_html__('If Smart Coupons throws PHP 8+ errors, skip its stack and simulate discount heuristically.', 'wc-sc-debugger') . '</label>';
+    }
+
         $validation_type = isset($options['product_id_' . $args['field_id']]['type']) ? $options['product_id_' . $args['field_id']]['type'] : '';
 
         printf(
@@ -318,6 +348,14 @@ class AdminInterface {
                         <select id="debug_user" name="debug_user" class="wc-customer-search" data-placeholder="<?php esc_attr_e('Search for a customer&hellip;', 'wc-sc-debugger'); ?>" data-action="woocommerce_json_search_customers"></select>
                         <p class="description"><?php esc_html_e('Select a user to test user-specific coupon restrictions (e.g., "for new user only"). Leave empty for guest user.', 'wc-sc-debugger'); ?></p>
                     </div>
+
+                        <div class="field-group">
+                            <label>
+                                <input type="checkbox" id="skip_smart_coupons" />
+                                <?php esc_html_e('Skip Smart Coupons stack (simulate)', 'wc-sc-debugger'); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e('If Smart Coupons triggers PHP 8+ errors, skip its discount application and simulate discount so other constraints can still be evaluated.', 'wc-sc-debugger'); ?></p>
+                        </div>
 
                     <button id="run_debug" class="button button-primary"><?php esc_html_e('Run Debug', 'wc-sc-debugger'); ?></button>
                     <button id="clear_debug" class="button button-secondary"><?php esc_html_e('Clear Output', 'wc-sc-debugger'); ?></button>

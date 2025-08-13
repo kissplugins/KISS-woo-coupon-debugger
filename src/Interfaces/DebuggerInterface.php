@@ -18,9 +18,10 @@ interface DebuggerInterface {
      * @param string $coupon_code The coupon code to test
      * @param array  $product_ids Array of product IDs to test with
      * @param int    $user_id     User ID to simulate
+     * @param array  $options     Optional flags, e.g., ['skip_smart_coupons' => bool]
      * @return bool|\WP_Error True if coupon applied successfully, WP_Error on failure
      */
-    public function testCoupon(string $coupon_code, array $product_ids = [], int $user_id = 0);
+    public function testCoupon(string $coupon_code, array $product_ids = [], int $user_id = 0, array $options = []);
 
     /**
      * Start tracking hooks and filters

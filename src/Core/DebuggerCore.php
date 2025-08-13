@@ -73,7 +73,7 @@ class DebuggerCore implements DebuggerInterface {
      * @param int    $user_id     User ID to simulate
      * @return bool|\WP_Error True if coupon applied successfully, WP_Error on failure
      */
-    public function testCoupon(string $coupon_code, array $product_ids = [], int $user_id = 0) {
+    public function testCoupon(string $coupon_code, array $product_ids = [], int $user_id = 0, array $options = []) {
         $this->logger->log('info', sprintf(
             __('Starting coupon test for: "%s"', 'wc-sc-debugger'),
             $coupon_code
@@ -196,6 +196,41 @@ class DebuggerCore implements DebuggerInterface {
                 __('Cart total before coupon: %s', 'wc-sc-debugger'),
                 wc_price(WC()->cart->get_total('edit'))
             ));
+
+            // If configured to skip Smart Coupons stack, simulate result heuristically
+            if (!empty($options['skip_smart_coupons'])) {
+                $this->logger->log('warning', __('Skipping Smart Coupons stack (simulation mode enabled).', 'wc-sc-debugger'));
+                // Heuristic: if coupon exists and is not expired, assume discount applies
+                $wc_coupon = new \WC_Coupon($coupon_code);
+                if (!$wc_coupon || is_wp_error($wc_coupon)) {
+                    $this->logger->log('error', __('Coupon not found or invalid.', 'wc-sc-debugger'));
+                    return false;
+                }
+
+                // Basic validity checks
+                if (!$wc_coupon->get_date_expires() || ( $wc_coupon->get_date_expires() && $wc_coupon->get_date_expires()->getTimestamp() > time())) {
+                    // Simulate discount computation roughly for display
+                    $pre_total = WC()->cart->get_total('edit');
+                    $this->logger->log('info', sprintf(__('Simulated pre-discount total: %s', 'wc-sc-debugger'), wc_price($pre_total)));
+
+                    // Estimate discount based on type
+                    $discount_type = $wc_coupon->get_discount_type();
+                    $amount = (float) $wc_coupon->get_amount();
+                    $estimated = 0.0;
+                    if (in_array($discount_type, ['percent', 'percent_product'], true)) {
+                        $estimated = $pre_total * ($amount / 100.0);
+                    } elseif (in_array($discount_type, ['fixed_cart', 'fixed_product'], true)) {
+                        $estimated = min($amount, $pre_total);
+                    }
+                    $this->logger->log('success', sprintf(__('Simulated discount (estimate): %s', 'wc-sc-debugger'), wc_price($estimated)));
+                    $this->logger->log('success', sprintf(__('Simulated new total (estimate): %s', 'wc-sc-debugger'), wc_price(max(0, $pre_total - $estimated))));
+
+                    return true;
+                } else {
+                    $this->logger->log('error', __('Coupon appears expired based on its settings.', 'wc-sc-debugger'));
+                    return false;
+                }
+            }
 
             $this->logger->log('info', sprintf(
                 __('Attempting to apply coupon: "%s"', 'wc-sc-debugger'),

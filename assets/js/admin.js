@@ -3,6 +3,7 @@ jQuery(document).ready(function($) {
     var $debugProductsSelect = $('#debug_products_select');
     var $debugUserSelect = $('#debug_user');
     var $runDebugButton = $('#run_debug');
+    var $skipSmartCoupons = $('#skip_smart_coupons');
     var $clearDebugButton = $('#clear_debug');
     var $debugResults = $('#debug_results');
     var $loadingIndicator = $('.loading-indicator');
@@ -62,7 +63,8 @@ jQuery(document).ready(function($) {
                 security: wcSCDebugger.debug_coupon_nonce,
                 coupon_code: couponCode,
                 product_id: productId,
-                user_id: userId
+                user_id: userId,
+                skip_smart_coupons: $skipSmartCoupons.is(':checked') ? 1 : 0
             },
             success: function(response) {
                 $loadingIndicator.hide();
