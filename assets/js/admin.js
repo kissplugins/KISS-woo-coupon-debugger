@@ -70,7 +70,12 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     displayDebugMessages(response.data.messages);
                 } else {
-                    $debugResults.append('<div class="debug-message error">' + (response.data.message || 'An unknown error occurred.') + '</div>');
+                    // Check if this is a Smart Coupons compatibility error
+                    if (response.data && response.data.smart_coupons_error) {
+                        displaySmartCouponsError(response.data.message, response.data.debug_info);
+                    } else {
+                        $debugResults.append('<div class="debug-message error">' + (response.data.message || 'An unknown error occurred.') + '</div>');
+                    }
                 }
             },
             error: function(jqXHR, textStatus, errorThrown) {
@@ -174,5 +179,42 @@ jQuery(document).ready(function($) {
                 $messageDiv.toggleClass('expanded');
             });
         });
+    }
+
+    /**
+     * Display Smart Coupons compatibility error with helpful information
+     * @param {string} message - Error message
+     * @param {object} debugInfo - Debug information
+     */
+    function displaySmartCouponsError(message, debugInfo) {
+        $debugResults.empty();
+
+        var errorHtml = '<div class="debug-message error smart-coupons-error">';
+        errorHtml += '<h3>🚨 Smart Coupons Compatibility Issue</h3>';
+        errorHtml += '<p><strong>' + message + '</strong></p>';
+        errorHtml += '<div class="smart-coupons-help">';
+        errorHtml += '<h4>What does this mean?</h4>';
+        errorHtml += '<ul>';
+        errorHtml += '<li>The WooCommerce Smart Coupons plugin has a compatibility issue with your current PHP version</li>';
+        errorHtml += '<li>This is typically caused by running Smart Coupons on PHP 8+ when it was designed for older PHP versions</li>';
+        errorHtml += '<li>The coupon debugging cannot proceed due to this plugin conflict</li>';
+        errorHtml += '</ul>';
+        errorHtml += '<h4>How to fix this:</h4>';
+        errorHtml += '<ol>';
+        errorHtml += '<li><strong>Update Smart Coupons:</strong> Check if there\'s a newer version available that supports your PHP version</li>';
+        errorHtml += '<li><strong>Contact Support:</strong> Reach out to the Smart Coupons plugin author for PHP 8+ compatibility</li>';
+        errorHtml += '<li><strong>Temporary Workaround:</strong> You may need to downgrade PHP or disable Smart Coupons temporarily for debugging</li>';
+        errorHtml += '</ol>';
+        errorHtml += '</div>';
+
+        if (debugInfo) {
+            errorHtml += '<details class="debug-details">';
+            errorHtml += '<summary>Technical Details (for developers)</summary>';
+            errorHtml += '<pre>' + JSON.stringify(debugInfo, null, 2) + '</pre>';
+            errorHtml += '</details>';
+        }
+
+        errorHtml += '</div>';
+        $debugResults.append(errorHtml);
     }
 });
