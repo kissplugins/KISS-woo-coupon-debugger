@@ -113,14 +113,7 @@ class Autoloader {
                 return $file;
             }
 
-            // Temporary compatibility: handle legacy filename for AdminUI
-            // If looking for Admin/AdminUI.php but only AdminInterface.php exists
-            if (substr($file, -strlen('Admin/AdminUI.php')) === 'Admin/AdminUI.php') {
-                $alt = substr($file, 0, -strlen('Admin/AdminUI.php')) . 'Admin/AdminInterface.php';
-                if (self::requireFile($alt)) {
-                    return $alt;
-                }
-            }
+
         }
         
         // Never found it
