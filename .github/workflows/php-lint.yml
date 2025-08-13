@@ -1,0 +1,53 @@
+name: CI - PHP Lint
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['7.4', '8.1']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+
+      - name: Validate composer files
+        run: composer validate --no-interaction
+
+      - name: Install dependencies (dev)
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHP syntax check (php -l)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Linting PHP files with php -l"
+          # Use git ls-files for tracked files; skip vendor and node_modules
+          mapfile -t files < <(git ls-files '*.php' ':!:vendor/**' ':!:node_modules/**')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No PHP files to lint."
+            exit 0
+          fi
+          fail=0
+          for f in "${files[@]}"; do
+            php -l "$f" || fail=1
+          done
+          exit $fail
+
+      # Uncomment to run static analysis or coding standards
+      # - name: PHPStan
+      #   run: composer phpstan
+      # - name: PHPCS
+      #   run: composer phpcs
+

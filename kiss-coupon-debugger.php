@@ -45,6 +45,7 @@ use KissPlugins\WooCouponDebugger\Interfaces\DebuggerInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\HookTrackerInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\CartSimulatorInterface;
 use KissPlugins\WooCouponDebugger\Interfaces\ContainerInterface;
+use KissPlugins\WooCouponDebugger\Interfaces\SettingsRepositoryInterface;
 
 // Register autoloader
 Autoloader::register();
@@ -130,12 +131,19 @@ class WC_SC_Debugger {
 			);
 		});
 
+		$this->container->singleton( SettingsRepositoryInterface::class, function() {
+			return new \KissPlugins\WooCouponDebugger\Settings\SettingsRepository();
+		});
+
 		// Bind concrete classes
 		$this->container->singleton( AdminInterface::class, function() {
 			return new AdminInterface( WC_SC_DEBUGGER_VERSION );
 		});
 		$this->container->singleton( AjaxHandler::class, function( $container ) {
-			return new AjaxHandler( $container->get( DebuggerInterface::class ) );
+			return new AjaxHandler(
+				$container->get( DebuggerInterface::class ),
+				$container->get( SettingsRepositoryInterface::class )
+			);
 		});
 	}
 

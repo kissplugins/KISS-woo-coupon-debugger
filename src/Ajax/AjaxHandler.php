@@ -8,6 +8,7 @@
 namespace KissPlugins\WooCouponDebugger\Ajax;
 
 use KissPlugins\WooCouponDebugger\Interfaces\DebuggerInterface;
+use KissPlugins\WooCouponDebugger\Interfaces\SettingsRepositoryInterface;
 use Exception;
 
 /**
@@ -22,13 +23,18 @@ class AjaxHandler {
      */
     private $debugger;
 
+    /** @var SettingsRepositoryInterface */
+    private $settings;
+
     /**
      * Constructor
      *
-     * @param DebuggerInterface $debugger Debugger instance
+     * @param DebuggerInterface            $debugger Debugger instance
+     * @param SettingsRepositoryInterface  $settings Settings repository
      */
-    public function __construct(DebuggerInterface $debugger) {
+    public function __construct(DebuggerInterface $debugger, SettingsRepositoryInterface $settings) {
         $this->debugger = $debugger;
+        $this->settings = $settings;
     }
 
     /**
@@ -182,7 +188,9 @@ class AjaxHandler {
             'coupon_code' => $coupon_code,
             'product_ids' => $product_ids,
             'user_id' => $user_id,
-            'skip_smart_coupons' => isset($_POST['skip_smart_coupons']) ? (bool) absint(wp_unslash($_POST['skip_smart_coupons'])) : (bool) get_option('wc_sc_debugger_skip_smart_coupons', 0),
+            'skip_smart_coupons' => isset($_POST['skip_smart_coupons'])
+                ? (bool) absint(wp_unslash($_POST['skip_smart_coupons']))
+                : $this->settings->getSkipSmartCoupons(),
         ];
     }
 
