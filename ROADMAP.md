@@ -2,6 +2,171 @@
 
 This document outlines planned features and improvements for future versions of the KISS Woo Coupon Debugger plugin.
 
+## Claude code fixes for non PSR4 v1.x series.
+
+Looking at this WooCommerce coupon debugger plugin, I've identified 3 critical issues that should be addressed for security and performance:
+
+## 1. **Unbounded Memory Usage and Potential DoS** (Critical)
+
+**Location**: `log_message()` function in `kiss-coupon-debugger.php`
+
+**Issue**: The debug message array can grow indefinitely with only a soft limit of 1000 messages:
+
+```php
+public static function log_message( $type, $message, $data = array() ) {
+    // Prevent excessive logging
+    if ( count( self::$debug_messages ) > 1000 ) {
+        self::$debug_messages[] = array(
+            'type'    => 'warning',
+            'message' => __( 'Debug message limit reached. Some messages may be omitted.', 'wc-sc-debugger' ),
+            'data'    => array(),
+        );
+        return; // This doesn't actually stop logging - it adds another message!
+    }
+```
+
+**Problems**:
+- The limit check adds a message but doesn't prevent further messages
+- No limits on individual message size
+- Complex object serialization in `sanitize_for_logging()` can consume massive memory
+- Potential for memory exhaustion attacks
+
+**Fix**:
+```php
+public static function log_message( $type, $message, $data = array() ) {
+    if ( count( self::$debug_messages ) >= 1000 ) {
+        return; // Hard stop at limit
+    }
+    
+    // Limit individual message data size
+    if ( is_array( $data ) && strlen( json_encode( $data ) ) > 10240 ) { // 10KB limit
+        $data = array( 'message' => 'Data too large to log' );
+    }
+    
+    self::$debug_messages[] = array(
+        'type'    => $type,
+        'message' => substr( $message, 0, 1000 ), // Limit message length
+        'data'    => $data,
+    );
+}
+```
+
+## 2. **Infinite Recursion in Object Sanitization** (High)
+
+**Location**: `sanitize_for_logging()` function
+
+**Issue**: The circular reference detection is flawed and can lead to infinite loops:
+
+```php
+private function sanitize_for_logging( $data, $depth = 0, &$stack = array() ) {
+    if ( $depth > 3 ) {
+        return '[Max Depth Reached]';
+    }
+
+    if ( is_object( $data ) ) {
+        $hash = spl_object_hash( $data );
+        if ( isset( $stack[ $hash ] ) ) {
+            return sprintf( '[Circular Reference: %s]', get_class( $data ) );
+        }
+        $stack[ $hash ] = true;
+        
+        // ... processing ...
+        
+        unset( $stack[ $hash ] ); // This allows the same object to be processed again!
+        return $result;
+    }
+}
+```
+
+**Problems**:
+- Unsetting from stack allows infinite recursion with complex object graphs
+- No timeout protection
+- Can cause PHP fatal errors or memory exhaustion
+
+**Fix**:
+```php
+private function sanitize_for_logging( $data, $depth = 0, &$stack = array() ) {
+    if ( $depth > 2 ) { // Reduce max depth
+        return '[Max Depth Reached]';
+    }
+
+    if ( is_object( $data ) ) {
+        $hash = spl_object_hash( $data );
+        if ( isset( $stack[ $hash ] ) ) {
+            return sprintf( '[Circular Reference: %s]', get_class( $data ) );
+        }
+        $stack[ $hash ] = true;
+        
+        // ... processing ...
+        
+        // Don't unset - keep permanent record to prevent reprocessing
+        return $result;
+    }
+    
+    // Add array protection too
+    if ( is_array( $data ) && count( $data ) > 100 ) {
+        return '[Large Array - ' . count( $data ) . ' items]';
+    }
+}
+```
+
+## 3. **Inadequate AJAX Input Validation** (Medium-High)
+
+**Location**: `handle_debug_coupon_ajax()` function
+
+**Issue**: Minimal validation on user inputs that control plugin behavior:
+
+```php
+$coupon_code = isset( $_POST['coupon_code'] ) ? sanitize_text_field( wp_unslash( $_POST['coupon_code'] ) ) : '';
+$product_id_selected = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+$user_id = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
+```
+
+**Problems**:
+- No length limits on coupon code (could be used for resource exhaustion)
+- No validation that user_id exists or is accessible to current user
+- No rate limiting on debug requests
+- Product ID validation happens later, allowing invalid IDs to enter processing
+
+**Fix**:
+```php
+// Validate coupon code
+$coupon_code = isset( $_POST['coupon_code'] ) ? sanitize_text_field( wp_unslash( $_POST['coupon_code'] ) ) : '';
+if ( strlen( $coupon_code ) > 50 ) { // Reasonable coupon code limit
+    wp_send_json_error( array( 'message' => __( 'Coupon code too long.', 'wc-sc-debugger' ) ) );
+}
+
+// Validate product ID exists if provided
+$product_id_selected = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+if ( $product_id_selected > 0 && ! wc_get_product( $product_id_selected ) ) {
+    wp_send_json_error( array( 'message' => __( 'Invalid product ID.', 'wc-sc-debugger' ) ) );
+}
+
+// Validate user ID exists if provided  
+$user_id = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
+if ( $user_id > 0 && ! get_user_by( 'id', $user_id ) ) {
+    wp_send_json_error( array( 'message' => __( 'Invalid user ID.', 'wc-sc-debugger' ) ) );
+}
+
+// Add simple rate limiting
+$rate_limit_key = 'wc_sc_debug_' . get_current_user_id();
+$recent_requests = get_transient( $rate_limit_key );
+if ( $recent_requests && $recent_requests > 10 ) { // 10 requests per minute
+    wp_send_json_error( array( 'message' => __( 'Too many debug requests. Please wait.', 'wc-sc-debugger' ) ) );
+}
+set_transient( $rate_limit_key, ( $recent_requests ?: 0 ) + 1, 60 );
+```
+
+## Summary
+
+While this plugin operates in a trusted admin environment, these issues could still cause:
+- **Server crashes** from memory exhaustion
+- **Performance degradation** from infinite loops
+- **Resource abuse** from malicious or accidental overuse
+
+The fixes focus on adding proper bounds checking, preventing infinite recursion, and validating inputs before processing.
+
+
 ## Enhanced Testing Capabilities
 
 ### Bulk Testing Mode
