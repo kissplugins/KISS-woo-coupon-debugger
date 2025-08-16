@@ -6,6 +6,34 @@
     margin-top: 20px;
 }
 
+/* Environment Info Box */
+.wc-sc-debugger-env-info {
+    margin-top: 20px;
+    padding: 15px 20px;
+    background: #fff;
+    border-left: 4px solid #46b450;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.wc-sc-debugger-env-info h2 {
+    margin: 0 0 10px;
+    font-size: 1.2em;
+}
+
+.wc-sc-debugger-env-info ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+}
+
+.wc-sc-debugger-env-info li {
+    font-size: 0.9em;
+}
+
+
 /* Form section styling */
 .wc-sc-debugger-form {
     flex: 1;
@@ -59,6 +87,13 @@
     margin-top: 0;
     margin-bottom: 15px;
     color: #333;
+}
+
+.wc-sc-debugger-version {
+    font-size: 0.7em;
+    color: #999;
+    font-weight: normal;
+    vertical-align: middle;
 }
 
 .debug-results {

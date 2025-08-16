@@ -3,19 +3,12 @@
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     1.2.0
+ * Version:     1.4.2
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
- * License:     GPL-3.0+
- * License URI: http://www.gnu.org/licenses/gpl-3.0.html
+ * License:     GPL-2.0
  * Text Domain: wc-sc-debugger
  * Domain Path: /languages
- *
- * Changelog
- *
- * #### 1.2.0 - 2025-08-03
- * - Fix: PHP fatal error by ensuring WC notices are correctly handled during the test simulation.
- * - Tweak: Improved session handling during the coupon test.
  *
  * @package WC_SC_Debugger
  */
@@ -39,11 +32,32 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		private static $instance = null;
 
 		/**
+		 * The plugin version number.
+		 *
+		 * @var string
+		 */
+		const VERSION = '1.4.2';
+
+		/**
 		 * Array to store debugging messages.
 		 *
 		 * @var array
 		 */
 		public static $debug_messages = array();
+
+		/**
+		 * Maximum execution time for debugging operations
+		 *
+		 * @var int
+		 */
+		private $max_execution_time = 30;
+
+		/**
+		 * Track if hooks are currently being monitored to prevent recursion
+		 *
+		 * @var bool
+		 */
+		private $hooks_tracking_active = false;
 
 		/**
 		 * Get the singleton instance of the plugin.
@@ -66,6 +80,18 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			add_action( 'admin_init', array( $this, 'register_settings' ) );
 			add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 			add_action( 'wp_ajax_wc_sc_debug_coupon', array( $this, 'handle_debug_coupon_ajax' ) );
+			
+			// Ensure WooCommerce session is initialized for AJAX requests
+			add_action( 'woocommerce_init', array( $this, 'maybe_init_session' ) );
+		}
+
+		/**
+		 * Initialize WooCommerce session if needed
+		 */
+		public function maybe_init_session() {
+			if ( wp_doing_ajax() && ! WC()->session->has_session() ) {
+				WC()->session->set_customer_session_cookie( true );
+			}
 		}
 
 		/**
@@ -142,10 +168,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 */
 		public function product_id_field_callback( $args ) {
 			$options = get_option( 'wc_sc_debugger_validated_products', array() );
-			$product_id = $options[ 'product_id_' . $args['field_id'] ]['id'] ?? '';
-			$product_name = $options[ 'product_id_' . $args['field_id'] ]['name'] ?? '';
-			$validation_message = $options[ 'product_id_' . $args['field_id'] ]['message'] ?? '';
-			$validation_type = $options[ 'product_id_' . $args['field_id'] ]['type'] ?? '';
+			$product_id = isset( $options[ 'product_id_' . $args['field_id'] ]['id'] ) ? $options[ 'product_id_' . $args['field_id'] ]['id'] : '';
+			$product_name = isset( $options[ 'product_id_' . $args['field_id'] ]['name'] ) ? $options[ 'product_id_' . $args['field_id'] ]['name'] : '';
+			$validation_message = isset( $options[ 'product_id_' . $args['field_id'] ]['message'] ) ? $options[ 'product_id_' . $args['field_id'] ]['message'] : '';
+			$validation_type = isset( $options[ 'product_id_' . $args['field_id'] ]['type'] ) ? $options[ 'product_id_' . $args['field_id'] ]['type'] : '';
 
 			printf(
 				'<input type="text" id="%1$s" name="wc_sc_debugger_validated_products[product_id_%2$s][id]" value="%3$s" class="regular-text" placeholder="%4$s" />',
@@ -174,7 +200,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			$new_options = array();
 			for ( $i = 1; $i <= 3; $i++ ) {
 				$field_key = 'product_id_' . $i;
-				$id = absint( $input[ $field_key ]['id'] ?? 0 );
+				$id = isset( $input[ $field_key ]['id'] ) ? absint( $input[ $field_key ]['id'] ) : 0;
 				$product_name = '';
 				$message = '';
 				$type = '';
@@ -205,7 +231,6 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			return $new_options;
 		}
 
-
 		/**
 		 * Enqueue admin scripts and styles.
 		 *
@@ -223,7 +248,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.2.0', // Updated version.
+				self::VERSION,
 				true
 			);
 
@@ -241,7 +266,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
-				'1.0.0'
+				self::VERSION
 			);
 		}
 
@@ -249,10 +274,24 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * Render the main debugger admin page content.
 		 */
 		public function render_admin_page() {
+			global $wpdb;
 			$validated_products = get_option( 'wc_sc_debugger_validated_products', array() );
+			$current_theme = wp_get_theme();
 			?>
 			<div class="wrap woocommerce">
-				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger', 'wc-sc-debugger' ); ?></h1>
+				<h1><?php echo esc_html__( 'KISS Woo Coupon Debugger', 'wc-sc-debugger' ); ?> <span class="wc-sc-debugger-version">v<?php echo esc_html( self::VERSION ); ?></span></h1>
+
+				<div class="wc-sc-debugger-env-info">
+					<h2 class="wc-sc-debugger-env-title"><?php esc_html_e( 'Environment Versions', 'wc-sc-debugger' ); ?></h2>
+					<ul>
+						<li><strong><?php esc_html_e( 'WordPress:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( get_bloginfo( 'version' ) ); ?></li>
+						<li><strong><?php esc_html_e( 'PHP:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( phpversion() ); ?></li>
+						<li><strong><?php esc_html_e( 'MySQL:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( $wpdb->get_var( 'SELECT VERSION()' ) ); ?></li>
+						<li><strong><?php esc_html_e( 'WooCommerce:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( WC()->version ); ?></li>
+						<li><strong><?php echo esc_html( $current_theme->get( 'Name' ) ); ?>:</strong> <?php echo esc_html( $current_theme->get( 'Version' ) ); ?></li>
+						<li><strong><?php esc_html_e( 'Coupon Debugger:', 'wc-sc-debugger' ); ?></strong> <?php echo esc_html( self::VERSION ); ?></li>
+					</ul>
+				</div>
 
 				<div class="wc-sc-debugger-container">
 					<div class="wc-sc-debugger-form">
@@ -278,7 +317,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 								}
 								?>
 							</select>
-							<p class="description"><?php esc_html_e( 'Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger' ); ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-sc-debugger-settings' ) ); ?>"><?php esc_html_e( 'SC Debugger Settings', 'wc-sc-debugger' ); ?></a> <?php esc_html_e( 'page.', 'wc-sc-debugger' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger' ); ?><a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-sc-debugger-settings' ) ); ?>"><?php esc_html_e( 'Debugger Settings', 'wc-sc-debugger' ); ?></a> <?php esc_html_e( 'page.', 'wc-sc-debugger' ); ?></p>
 						</div>
 
 						<div class="form-field">
@@ -311,7 +350,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		public function render_settings_page() {
 			?>
 			<div class="wrap woocommerce">
-				<h1><?php esc_html_e( 'WooCommerce Smart Coupons Debugger Settings', 'wc-sc-debugger' ); ?></h1>
+				<h1><?php echo esc_html__( 'KISS Woo Coupon Debugger Settings', 'wc-sc-debugger' ); ?> <span class="wc-sc-debugger-version">v<?php echo esc_html( self::VERSION ); ?></span></h1>
 				<form method="post" action="options.php">
 					<?php
 					settings_fields( 'wc_sc_debugger_options_group' );
@@ -327,19 +366,40 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * Handle AJAX request for debugging coupon.
 		 */
 		public function handle_debug_coupon_ajax() {
+			// Set execution time limit
+			@set_time_limit( $this->max_execution_time );
+			
+			// Verify nonce
 			check_ajax_referer( 'wc-sc-debug-coupon-nonce', 'security' );
 
+			// Check permissions
 			if ( ! current_user_can( 'manage_woocommerce' ) ) {
 				wp_send_json_error( array( 'message' => __( 'You do not have permission to perform this action.', 'wc-sc-debugger' ) ) );
 			}
 
+			// Initialize WooCommerce if needed
+			if ( ! did_action( 'woocommerce_init' ) ) {
+				WC()->init();
+			}
+
+			// Ensure session is initialized
+			if ( ! WC()->session ) {
+				WC()->initialize_session();
+			}
+
+			// Force session initialization for AJAX
+			if ( ! WC()->session->has_session() ) {
+				WC()->session->set_customer_session_cookie( true );
+			}
+
+			// Verify WooCommerce components
 			if ( ! function_exists( 'WC' ) || ! isset( WC()->cart ) || ! is_object( WC()->cart ) || ! isset( WC()->session ) || ! is_object( WC()->session ) ) {
 				wp_send_json_error( array( 'message' => __( 'WooCommerce cart or session is not fully loaded. Please ensure WooCommerce is active and properly initialized.', 'wc-sc-debugger' ) ) );
 			}
 
-			$coupon_code = sanitize_text_field( wp_unslash( $_POST['coupon_code'] ?? '' ) );
-			$product_id_selected = absint( wp_unslash( $_POST['product_id'] ?? 0 ) );
-			$user_id     = absint( wp_unslash( $_POST['user_id'] ?? 0 ) );
+			$coupon_code = isset( $_POST['coupon_code'] ) ? sanitize_text_field( wp_unslash( $_POST['coupon_code'] ) ) : '';
+			$product_id_selected = isset( $_POST['product_id'] ) ? absint( wp_unslash( $_POST['product_id'] ) ) : 0;
+			$user_id = isset( $_POST['user_id'] ) ? absint( wp_unslash( $_POST['user_id'] ) ) : 0;
 
 			if ( empty( $coupon_code ) ) {
 				wp_send_json_error( array( 'message' => __( 'Please enter a coupon code.', 'wc-sc-debugger' ) ) );
@@ -348,6 +408,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			self::$debug_messages = array();
 
 			try {
+				// Add memory tracking
+				$initial_memory = memory_get_usage();
+				self::log_message( 'info', sprintf( __( 'Initial memory usage: %s', 'wc-sc-debugger' ), size_format( $initial_memory ) ) );
+
 				$this->start_hook_tracking();
 
 				$product_ids_for_test = ( $product_id_selected > 0 ) ? array( $product_id_selected ) : array();
@@ -355,6 +419,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				$result = $this->test_coupon( $coupon_code, $product_ids_for_test, $user_id );
 
 				$this->stop_hook_tracking();
+
+				// Check memory usage
+				$final_memory = memory_get_usage();
+				$memory_diff = $final_memory - $initial_memory;
+				self::log_message( 'info', sprintf( __( 'Memory used: %s', 'wc-sc-debugger' ), size_format( $memory_diff ) ) );
 
 				if ( is_wp_error( $result ) ) {
 					self::log_message( 'error', sprintf( __( 'Coupon application failed: %s', 'wc-sc-debugger' ), $result->get_error_message() ) );
@@ -371,9 +440,21 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 
 			} catch ( Exception $e ) {
 				error_log( 'WC SC Debugger AJAX Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine() );
+				
+				// Add more context to the error
+				$error_context = array(
+					'message' => $e->getMessage(),
+					'file' => $e->getFile(),
+					'line' => $e->getLine(),
+					'trace' => wp_debug_backtrace_summary()
+				);
+				
 				wp_send_json_error( array(
-					'message' => __( 'An unexpected server error occurred during debugging. Please check your server error logs for more details.', 'wc-sc-debugger' ),
-					'debug_info' => $e->getMessage(),
+					'message' => sprintf( 
+						__( 'An error occurred: %s. Please check your server error logs for more details.', 'wc-sc-debugger' ), 
+						$e->getMessage() 
+					),
+					'debug_info' => WP_DEBUG ? $error_context : null,
 				) );
 			}
 		}
@@ -386,6 +467,16 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @param array  $data    Optional data to include.
 		 */
 		public static function log_message( $type, $message, $data = array() ) {
+			// Prevent excessive logging
+			if ( count( self::$debug_messages ) > 1000 ) {
+				self::$debug_messages[] = array(
+					'type'    => 'warning',
+					'message' => __( 'Debug message limit reached. Some messages may be omitted.', 'wc-sc-debugger' ),
+					'data'    => array(),
+				);
+				return;
+			}
+
 			self::$debug_messages[] = array(
 				'type'    => $type,
 				'message' => $message,
@@ -397,110 +488,99 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * Start tracking relevant WooCommerce and Smart Coupons hooks and filters.
 		 */
 		private function start_hook_tracking() {
-			// Filters related to coupon validation.
-			add_filter( 'woocommerce_coupon_is_valid', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'woocommerce_coupon_is_valid_for_product', array( $this, 'track_filter' ), 9999, 4 );
-			add_filter( 'woocommerce_coupon_validate_expiry_date', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'woocommerce_coupon_get_discount_amount', array( $this, 'track_filter' ), 9999, 5 );
-			add_filter( 'woocommerce_apply_individual_use_coupon', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'woocommerce_apply_with_individual_use_coupon', array( $this, 'track_filter' ), 9999, 4 );
-			add_filter( 'wc_sc_validate_coupon_amount', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_is_send_coupon_email', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_is_coupon_restriction_available', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_percent_discount_types', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_type', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'wc_sc_coupon_amount', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_generated_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_max_fields_to_show_in_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_max_restricted_category_names', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_max_restricted_product_names', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_generate_unique_coupon_code', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_code_allowed_characters', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_style_attributes', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_coupon_container_classes', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_coupon_content_classes', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_coupon_design_thumbnail_src_set', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_coupon_design_thumbnail_src', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_storewide_offer_coupon_description', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_get_wc_sc_coupon_styles', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_get_coupon_styles', array( $this, 'track_filter' ), 9999, 3 );
-			add_filter( 'wc_sc_coupon_cookie_life', array( $this, 'track_filter' ), 9999, 1 );
-			add_filter( 'wc_sc_is_generated_store_credit_includes_tax', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_read_price', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_write_price', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_after_get_post_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_before_update_post_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_after_get_session', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_before_set_session', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_after_get_order_item_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_before_update_order_item_meta', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_pending_order_statuses', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'wc_sc_order_actions_to_ignore_for_email', array( $this, 'track_filter' ), 9999, 2 );
-			add_filter( 'woocommerce_coupon_error', array( $this, 'track_filter' ), 9999, 3 );
+			if ( $this->hooks_tracking_active ) {
+				return; // Prevent recursion
+			}
+			
+			$this->hooks_tracking_active = true;
 
-			// Actions related to coupon processing.
-			add_action( 'woocommerce_applied_coupon', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'woocommerce_removed_coupon', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'woocommerce_coupon_loaded', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'woocommerce_before_calculate_totals', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'woocommerce_after_calculate_totals', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'wc_sc_new_coupon_generated', array( $this, 'track_action' ), 9999, 1 );
-			add_action( 'smart_coupons_after_calculate_totals', array( $this, 'track_action' ), 9999, 0 );
-			add_action( 'sc_after_order_calculate_discount_amount', array( $this, 'track_action' ), 9999, 1 );
+			// Core coupon validation filters
+			$core_filters = array(
+				'woocommerce_coupon_is_valid',
+				'woocommerce_coupon_is_valid_for_product',
+				'woocommerce_coupon_validate_expiry_date',
+				'woocommerce_coupon_get_discount_amount',
+				'woocommerce_apply_individual_use_coupon',
+				'woocommerce_apply_with_individual_use_coupon',
+				'woocommerce_coupon_error'
+			);
+
+			// Smart Coupons specific filters
+			$sc_filters = array(
+				'wc_sc_validate_coupon_amount',
+				'wc_sc_is_send_coupon_email',
+				'wc_sc_is_coupon_restriction_available',
+				'wc_sc_percent_discount_types',
+				'wc_sc_coupon_type',
+				'wc_sc_coupon_amount'
+			);
+
+			// Add filters with appropriate argument counts
+			foreach ( $core_filters as $filter ) {
+				add_filter( $filter, array( $this, 'track_filter' ), 9999, 10 );
+			}
+
+			foreach ( $sc_filters as $filter ) {
+				add_filter( $filter, array( $this, 'track_filter' ), 9999, 10 );
+			}
+
+			// Actions
+			$actions = array(
+				'woocommerce_applied_coupon',
+				'woocommerce_removed_coupon',
+				'woocommerce_coupon_loaded',
+				'woocommerce_before_calculate_totals',
+				'woocommerce_after_calculate_totals'
+			);
+
+			foreach ( $actions as $action ) {
+				add_action( $action, array( $this, 'track_action' ), 9999, 10 );
+			}
 		}
 
 		/**
 		 * Stop tracking hooks and filters.
 		 */
 		private function stop_hook_tracking() {
-			remove_filter( 'woocommerce_coupon_is_valid', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'woocommerce_coupon_is_valid_for_product', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'woocommerce_coupon_validate_expiry_date', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'woocommerce_coupon_get_discount_amount', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'woocommerce_apply_individual_use_coupon', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'woocommerce_apply_with_individual_use_coupon', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_validate_coupon_amount', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_is_send_coupon_email', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_is_coupon_restriction_available', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_percent_discount_types', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_type', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_amount', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_generated_coupon_description', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_max_fields_to_show_in_coupon_description', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_max_restricted_category_names', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_max_restricted_product_names', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_generate_unique_coupon_code', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_code_allowed_characters', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_style_attributes', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_container_classes', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_content_classes', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_design_thumbnail_src_set', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_design_thumbnail_src', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_storewide_offer_coupon_description', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_get_wc_sc_coupon_styles', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_get_coupon_styles', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_coupon_cookie_life', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_is_generated_store_credit_includes_tax', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_read_price', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_write_price', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_after_get_post_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_before_update_post_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_after_get_session', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_before_set_session', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_after_get_order_item_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_before_update_order_item_meta', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_pending_order_statuses', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'wc_sc_order_actions_to_ignore_for_email', array( $this, 'track_filter' ), 9999 );
-			remove_filter( 'woocommerce_coupon_error', array( $this, 'track_filter' ), 9999 );
+			if ( ! $this->hooks_tracking_active ) {
+				return;
+			}
 
-			remove_action( 'woocommerce_applied_coupon', array( $this, 'track_action' ), 9999 );
-			remove_action( 'woocommerce_removed_coupon', array( $this, 'track_action' ), 9999 );
-			remove_action( 'woocommerce_coupon_loaded', array( $this, 'track_action' ), 9999 );
-			remove_action( 'woocommerce_before_calculate_totals', array( $this, 'track_action' ), 9999 );
-			remove_action( 'woocommerce_after_calculate_totals', array( $this, 'track_action' ), 9999 );
-			remove_action( 'wc_sc_new_coupon_generated', array( $this, 'track_action' ), 9999 );
-			remove_action( 'smart_coupons_after_calculate_totals', array( $this, 'track_action' ), 9999 );
-			remove_action( 'sc_after_order_calculate_discount_amount', array( $this, 'track_action' ), 9999 );
+			$this->hooks_tracking_active = false;
+
+			// Remove all filters
+			$all_filters = array(
+				'woocommerce_coupon_is_valid',
+				'woocommerce_coupon_is_valid_for_product',
+				'woocommerce_coupon_validate_expiry_date',
+				'woocommerce_coupon_get_discount_amount',
+				'woocommerce_apply_individual_use_coupon',
+				'woocommerce_apply_with_individual_use_coupon',
+				'woocommerce_coupon_error',
+				'wc_sc_validate_coupon_amount',
+				'wc_sc_is_send_coupon_email',
+				'wc_sc_is_coupon_restriction_available',
+				'wc_sc_percent_discount_types',
+				'wc_sc_coupon_type',
+				'wc_sc_coupon_amount'
+			);
+
+			foreach ( $all_filters as $filter ) {
+				remove_filter( $filter, array( $this, 'track_filter' ), 9999 );
+			}
+
+			// Remove all actions
+			$all_actions = array(
+				'woocommerce_applied_coupon',
+				'woocommerce_removed_coupon',
+				'woocommerce_coupon_loaded',
+				'woocommerce_before_calculate_totals',
+				'woocommerce_after_calculate_totals'
+			);
+
+			foreach ( $all_actions as $action ) {
+				remove_action( $action, array( $this, 'track_action' ), 9999 );
+			}
 		}
 
 		/**
@@ -511,6 +591,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @return mixed The original value.
 		 */
 		public function track_filter( $value, ...$args ) {
+			if ( ! $this->hooks_tracking_active ) {
+				return $value; // Prevent logging during restoration
+			}
+
 			$filter_name = current_filter();
 			self::log_message(
 				'filter',
@@ -529,6 +613,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @param mixed ...$args Arguments passed to the action.
 		 */
 		public function track_action( ...$args ) {
+			if ( ! $this->hooks_tracking_active ) {
+				return; // Prevent logging during restoration
+			}
+
 			$action_name = current_action();
 			self::log_message(
 				'action',
@@ -549,7 +637,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 */
 		private function sanitize_for_logging( $data, $depth = 0, &$stack = array() ) {
 			// Limit recursion depth to prevent memory exhaustion.
-			if ( $depth > 5 ) {
+			if ( $depth > 3 ) {
 				return '[Max Depth Reached]';
 			}
 
@@ -578,7 +666,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 						'name' => $data->get_name(),
 					);
 				} elseif ( $data instanceof WC_Cart ) {
-					$result = '[Object: WC_Cart]'; // Avoid deep serialization.
+					$result = '[Object: WC_Cart]';
 				} elseif ( $data instanceof WP_Error ) {
 					$result = array(
 						'type'    => 'WP_Error',
@@ -613,13 +701,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @return bool|WP_Error True if coupon applied successfully, WP_Error on failure.
 		 */
 		private function test_coupon( $coupon_code, $product_ids = array(), $user_id = 0 ) {
-			// Store original state.
-			$original_cart_contents   = WC()->cart->get_cart_contents();
-			$original_applied_coupons = WC()->cart->get_applied_coupons();
-			$original_session_data    = WC()->session ? WC()->session->get_session_data() : array();
-			$original_user_id         = get_current_user_id();
-			// Explicitly back up notices to prevent state leakage and fatal errors.
-			$original_notices = WC()->session ? WC()->session->get( 'wc_notices', array() ) : array();
+			// Temporarily disable hooks tracking to prevent recursion during backup
+			$hooks_were_active = $this->hooks_tracking_active;
+			$this->hooks_tracking_active = false;
+
 
 			// Clear the current cart and session for a clean test.
 			WC()->cart->empty_cart( true );
@@ -641,82 +726,438 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				self::log_message( 'info', __( 'Simulating guest user.', 'wc-sc-debugger' ) );
 			}
 
+			// Temporarily add deep validation hooks to trace add_to_cart issues.
+			add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'track_filter' ), 9999, 6 );
+
 			// Add products to the cart.
 			if ( ! empty( $product_ids ) ) {
 				foreach ( $product_ids as $product_id ) {
 					$product = wc_get_product( $product_id );
 					if ( $product && $product->is_purchasable() ) {
-						WC()->cart->add_to_cart( $product_id, 1 );
-						self::log_message( 'info', sprintf( __( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						$add_to_cart_result = WC()->cart->add_to_cart( $product_id, 1 );
+
+						$generated_notices = wc_get_notices();
+						if ( ! empty( $generated_notices ) ) {
+							self::log_message( 'warning', __( 'Notices were generated during add_to_cart() call.', 'wc-sc-debugger' ), array( 'args' => $generated_notices ) );
+							wc_clear_notices(); // Clear them after logging so they don't persist.
+						}
+
+						if ( false !== $add_to_cart_result ) {
+							self::log_message( 'success', sprintf( __( 'Successfully added product to cart: %s (ID: %d).', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						} else {
+							self::log_message( 'error', sprintf( __( 'Failed to add product to cart: %s (ID: %d). add_to_cart() returned false.', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+						}
 					} else {
-						self::log_message( 'warning', sprintf( __( 'Could not add product ID %d to cart (might not be purchasable or found).', 'wc-sc-debugger' ), $product_id ) );
+						$reason = __( 'is not purchasable or could not be found', 'wc-sc-debugger' );
+						if ( ! $product ) {
+							$reason = __( 'could not be found', 'wc-sc-debugger' );
+						} elseif ( ! $product->is_purchasable() ) {
+							$reason = __( 'is not purchasable (e.g., no price, out of stock)', 'wc-sc-debugger' );
+						}
+						self::log_message( 'warning', sprintf( __( 'Could not add product ID %d to cart because it %s.', 'wc-sc-debugger' ), $product_id, $reason ) );
+
+			// Store original state with error handling
+			try {
+				$original_cart_contents = WC()->cart->get_cart_contents();
+				$original_applied_coupons = WC()->cart->get_applied_coupons();
+				$original_user_id = get_current_user_id();
+				
+				// Safely get session data
+				$original_session_data = array();
+				if ( WC()->session && method_exists( WC()->session, 'get_session_data' ) ) {
+					$original_session_data = WC()->session->get_session_data();
+				}
+				
+				// Safely backup notices
+				$original_notices = array();
+				if ( WC()->session ) {
+					$original_notices = WC()->session->get( 'wc_notices', array() );
+					if ( ! is_array( $original_notices ) ) {
+						$original_notices = array();
+
 					}
 				}
+			} catch ( Exception $e ) {
+				self::log_message( 'error', sprintf( __( 'Failed to backup cart state: %s', 'wc-sc-debugger' ), $e->getMessage() ) );
+				return new WP_Error( 'backup_failed', __( 'Could not backup cart state for testing.', 'wc-sc-debugger' ) );
 			}
+
+
+			// Remove the temporary hooks after the loop.
+			remove_filter( 'woocommerce_add_to_cart_validation', array( $this, 'track_filter' ), 9999 );
 
 			// If cart is still empty, add a dummy product.
 			if ( WC()->cart->is_empty() ) {
 				$dummy_product_id = $this->get_or_create_dummy_product();
 				if ( $dummy_product_id ) {
+					$dummy_product = wc_get_product( $dummy_product_id );
+					if ( $dummy_product ) {
+						self::log_message(
+							'info',
+							sprintf(
+								'Dummy product details: Price=%s, Type=%s, Status=%s',
+								$dummy_product->get_price(),
+								$dummy_product->get_type(),
+								$dummy_product->get_status()
+							)
+						);
+					}
 					WC()->cart->add_to_cart( $dummy_product_id, 1 );
 					self::log_message( 'info', sprintf( __( 'Cart was empty, added dummy product (ID: %d) for testing general coupons.', 'wc-sc-debugger' ), $dummy_product_id ) );
 				} else {
 					self::log_message( 'error', __( 'Could not create or find a dummy product for testing, and cart is empty.', 'wc-sc-debugger' ) );
 					return new WP_Error( 'no_dummy_product', __( 'Cannot proceed without a product in cart for testing.', 'wc-sc-debugger' ) );
 				}
+
+			// Re-enable hooks tracking if it was active
+			if ( $hooks_were_active ) {
+				$this->hooks_tracking_active = true;
+
 			}
 
-			WC()->cart->calculate_totals();
+			// Add filter to prevent Smart Coupons from modifying items during our test
+			add_filter( 'woocommerce_coupon_get_items_to_validate', array( $this, 'ensure_valid_cart_items' ), 1, 2 );
 
-			self::log_message( 'info', sprintf( __( 'Attempting to apply coupon: "%s"', 'wc-sc-debugger' ), $coupon_code ) );
 
-			$coupon_applied = false;
 			try {
+				// Clear the current cart and session for a clean test
+				WC()->cart->empty_cart( true );
+				if ( WC()->session ) {
+					WC()->session->set( 'wc_notices', array() );
+					WC()->session->set( 'sc_coupon_valid', null );
+					WC()->session->set( 'sc_coupon_error', null );
+					WC()->session->set( 'wc_sc_cart_smart_coupons', array() );
+				}
+
+				// Simulate user login if a user ID is provided
+				if ( $user_id > 0 && get_user_by( 'id', $user_id ) ) {
+					wp_set_current_user( $user_id );
+					self::log_message( 'info', sprintf( __( 'Simulating user ID: %d', 'wc-sc-debugger' ), $user_id ) );
+				} else {
+					wp_set_current_user( 0 );
+					self::log_message( 'info', __( 'Simulating guest user.', 'wc-sc-debugger' ) );
+				}
+
+				// Add products to the cart
+				$products_added = false;
+				if ( ! empty( $product_ids ) ) {
+					foreach ( $product_ids as $product_id ) {
+						$added = $this->add_product_to_cart( $product_id );
+						if ( $added ) {
+							$products_added = true;
+						}
+					}
+				}
+
+				// If cart is still empty, add a dummy product
+				if ( WC()->cart->is_empty() ) {
+					$dummy_product_id = $this->get_or_create_dummy_product();
+					if ( $dummy_product_id ) {
+						$cart_item_key = WC()->cart->add_to_cart( $dummy_product_id, 1 );
+						if ( $cart_item_key ) {
+							self::log_message( 'info', sprintf( __( 'Cart was empty, added dummy product (ID: %d) for testing general coupons.', 'wc-sc-debugger' ), $dummy_product_id ) );
+						} else {
+							throw new Exception( __( 'Failed to add dummy product to cart.', 'wc-sc-debugger' ) );
+						}
+					} else {
+						throw new Exception( __( 'Could not create or find a dummy product for testing.', 'wc-sc-debugger' ) );
+					}
+				}
+
+				// Calculate totals before applying coupon
+				WC()->cart->calculate_totals();
+
+				self::log_message( 'info', sprintf( __( 'Cart total before coupon: %s', 'wc-sc-debugger' ), wc_price( WC()->cart->get_total( 'edit' ) ) ) );
+				self::log_message( 'info', sprintf( __( 'Attempting to apply coupon: "%s"', 'wc-sc-debugger' ), $coupon_code ) );
+
+				// Apply the coupon
+				$coupon_applied = false;
 				$coupon_applied = WC()->cart->apply_coupon( $coupon_code );
 
 				if ( is_wp_error( $coupon_applied ) ) {
 					self::log_message( 'error', sprintf( __( 'Failed to apply coupon: %s', 'wc-sc-debugger' ), $coupon_applied->get_error_message() ) );
-					$coupon_applied = false;
+					$result = false;
 				} elseif ( ! $coupon_applied ) {
+					// Check for WooCommerce notices
+					$notices = wc_get_notices( 'error' );
+					if ( ! empty( $notices ) ) {
+						foreach ( $notices as $notice ) {
+							$notice_text = is_array( $notice ) ? $notice['notice'] : $notice;
+							self::log_message( 'error', sprintf( __( 'WooCommerce Notice: %s', 'wc-sc-debugger' ), $notice_text ) );
+						}
+					}
 					self::log_message( 'error', __( 'Coupon could not be applied. Check coupon validity and restrictions.', 'wc-sc-debugger' ) );
+					$result = false;
 				} else {
 					WC()->cart->calculate_totals();
 					$cart_total = WC()->cart->get_total( 'edit' );
+					$discount_total = WC()->cart->get_discount_total();
+					self::log_message( 'success', __( 'Coupon applied successfully!', 'wc-sc-debugger' ) );
 					self::log_message( 'success', sprintf( __( 'New Cart Total: %s', 'wc-sc-debugger' ), wc_price( $cart_total ) ) );
+					self::log_message( 'success', sprintf( __( 'Discount Amount: %s', 'wc-sc-debugger' ), wc_price( $discount_total ) ) );
+					$result = true;
+				}
+
+			} catch ( Exception $e ) {
+				self::log_message( 'error', sprintf( __( 'Exception during coupon test: %s', 'wc-sc-debugger' ), $e->getMessage() ) );
+				$result = new WP_Error( 'test_exception', $e->getMessage() );
+			}
+
+			// Remove our filter
+			remove_filter( 'woocommerce_coupon_get_items_to_validate', array( $this, 'ensure_valid_cart_items' ), 1 );
+
+			// Restore original state
+			$this->restore_cart_state( $original_cart_contents, $original_applied_coupons, $original_session_data, $original_notices, $original_user_id );
+
+			return $result;
+		}
+
+		/**
+		 * Ensure cart items are properly structured for validation
+		 *
+		 * @param array $items Cart items
+		 * @param WC_Coupon $coupon Coupon object
+		 * @return array
+		 */
+		public function ensure_valid_cart_items( $items, $coupon ) {
+			if ( ! is_array( $items ) ) {
+				return $items;
+			}
+
+			foreach ( $items as $key => $item ) {
+				// Ensure each item has proper structure
+				if ( ! is_array( $item ) ) {
+					unset( $items[ $key ] );
+					continue;
+				}
+
+				// Ensure data property exists and is an object
+				if ( ! isset( $item['data'] ) || ! is_object( $item['data'] ) ) {
+					if ( isset( $item['product_id'] ) ) {
+						$product_id = isset( $item['variation_id'] ) && $item['variation_id'] ? $item['variation_id'] : $item['product_id'];
+						$product = wc_get_product( $product_id );
+						if ( $product ) {
+							$items[ $key ]['data'] = $product;
+						} else {
+							unset( $items[ $key ] );
+						}
+					} else {
+						unset( $items[ $key ] );
+					}
+				}
+
+				// Ensure quantity is numeric
+				if ( isset( $item['quantity'] ) && ! is_numeric( $item['quantity'] ) ) {
+					$items[ $key ]['quantity'] = 1;
+				}
+			}
+
+			return array_values( $items ); // Re-index array
+		}
+
+
+		/**
+		 * Restore cart state after testing
+		 *
+		 * @param array $original_cart_contents Original cart contents
+		 * @param array $original_applied_coupons Original applied coupons
+		 * @param array $original_session_data Original session data
+		 * @param array $original_notices Original notices
+		 * @param int $original_user_id Original user ID
+		 */
+		private function restore_cart_state( $original_cart_contents, $original_applied_coupons, $original_session_data, $original_notices, $original_user_id ) {
+			// Temporarily disable hooks tracking during restoration
+			$hooks_were_active = $this->hooks_tracking_active;
+			$this->hooks_tracking_active = false;
+
+			try {
+				// Clear cart
+				WC()->cart->empty_cart( true );
+
+				// Restore cart contents
+				foreach ( $original_cart_contents as $cart_item_key => $cart_item ) {
+					$product_id = isset( $cart_item['product_id'] ) ? $cart_item['product_id'] : 0;
+					$quantity = isset( $cart_item['quantity'] ) ? $cart_item['quantity'] : 1;
+					$variation_id = isset( $cart_item['variation_id'] ) ? $cart_item['variation_id'] : 0;
+					$variation = isset( $cart_item['variation'] ) && is_array( $cart_item['variation'] ) ? $cart_item['variation'] : array();
+					$cart_item_data = isset( $cart_item['data'] ) && is_array( $cart_item['data'] ) ? $cart_item['data'] : array();
+					
+					// Ensure we have a valid product ID
+					if ( $product_id ) {
+						WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation, $cart_item_data );
+					}
+				}
+
+				// Restore session data
+				if ( WC()->session && ! empty( $original_session_data ) ) {
+					foreach ( $original_session_data as $key => $value ) {
+						WC()->session->set( $key, $value );
+					}
+				}
+
+				// Restore notices
+				if ( WC()->session ) {
+					WC()->session->set( 'wc_notices', $original_notices );
+				}
+
+				// Restore applied coupons
+				foreach ( $original_applied_coupons as $coupon_code ) {
+					WC()->cart->apply_coupon( $coupon_code );
+				}
+
+				// Restore user
+				wp_set_current_user( $original_user_id );
+
+				// Recalculate totals
+				WC()->cart->calculate_totals();
+
+			} catch ( Exception $e ) {
+				error_log( 'WC SC Debugger: Failed to restore cart state - ' . $e->getMessage() );
+			}
+
+			// Re-enable hooks tracking if it was active
+			if ( $hooks_were_active ) {
+				$this->hooks_tracking_active = true;
+			}
+		}
+
+		/**
+		 * Add a product to cart, handling variable products by selecting first available variation
+		 *
+		 * @param int $product_id Product ID to add
+		 * @return bool True if product was added successfully
+		 */
+		private function add_product_to_cart( $product_id ) {
+			$product = wc_get_product( $product_id );
+			
+			if ( ! $product ) {
+				self::log_message( 'warning', sprintf( __( 'Product ID %d not found.', 'wc-sc-debugger' ), $product_id ) );
+				return false;
+			}
+
+			try {
+				// Handle variable products
+				if ( $product->is_type( 'variable' ) ) {
+					self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a variable product. Finding first available variation...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+					
+					// Get available variations
+					$variations = $product->get_available_variations();
+					
+					if ( empty( $variations ) ) {
+						self::log_message( 'warning', sprintf( __( 'No available variations found for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+						return false;
+					}
+					
+					// Find the first variation that's purchasable and in stock
+					foreach ( $variations as $variation_data ) {
+						$variation_id = $variation_data['variation_id'];
+						$variation = wc_get_product( $variation_id );
+						
+						if ( $variation && $variation->is_purchasable() && $variation->is_in_stock() ) {
+							// Get the variation attributes - ensure they're properly formatted
+							$variation_attributes = array();
+							if ( isset( $variation_data['attributes'] ) && is_array( $variation_data['attributes'] ) ) {
+								foreach ( $variation_data['attributes'] as $attr_name => $attr_value ) {
+									// Ensure attribute names and values are strings
+									$variation_attributes[ (string) $attr_name ] = (string) $attr_value;
+								}
+							}
+							
+							// Add variation to cart - let WooCommerce handle the data structure
+							$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, $variation_id, $variation_attributes );
+							
+							if ( $cart_item_key ) {
+								// Log the selected attributes
+								$attribute_string = '';
+								foreach ( $variation_attributes as $attr_name => $attr_value ) {
+									if ( ! empty( $attr_value ) ) {
+										$taxonomy = str_replace( 'attribute_', '', $attr_name );
+										$term = get_term_by( 'slug', $attr_value, $taxonomy );
+										$label = $term ? $term->name : $attr_value;
+										$attribute_string .= ucfirst( str_replace( 'pa_', '', $taxonomy ) ) . ': ' . $label . ', ';
+									}
+								}
+								$attribute_string = rtrim( $attribute_string, ', ' );
+								
+								self::log_message( 'success', sprintf( 
+									__( 'Added variable product to cart: %s (ID: %d, Variation ID: %d) - %s', 'wc-sc-debugger' ), 
+									$product->get_name(), 
+									$product_id, 
+									$variation_id,
+									$attribute_string
+								) );
+								return true;
+							}
+						}
+					}
+					
+					self::log_message( 'warning', sprintf( __( 'No purchasable variations in stock for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+					return false;
+					
+				} elseif ( $product->is_type( 'grouped' ) ) {
+					// Handle grouped products
+					self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a grouped product. Adding first available child product...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
+					
+					$children = $product->get_children();
+					if ( ! empty( $children ) ) {
+						foreach ( $children as $child_id ) {
+							$child_product = wc_get_product( $child_id );
+							if ( $child_product && $child_product->is_purchasable() && $child_product->is_in_stock() ) {
+								$cart_item_key = WC()->cart->add_to_cart( $child_id );
+								if ( $cart_item_key ) {
+									self::log_message( 'success', sprintf( 
+										__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ), 
+										$child_product->get_name(), 
+										$child_id,
+										$product_id 
+									) );
+									return true;
+								}
+							}
+						}
+					}
+					
+					self::log_message( 'warning', sprintf( __( 'No purchasable child products found for grouped product ID %d.', 'wc-sc-debugger' ), $product_id ) );
+					return false;
+					
+				} else {
+					// Handle simple products and other types
+					if ( $product->is_purchasable() && $product->is_in_stock() ) {
+						$cart_item_key = WC()->cart->add_to_cart( $product_id );
+						if ( $cart_item_key ) {
+							self::log_message( 'success', sprintf( 
+								__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), 
+								$product->get_name(), 
+								$product_id 
+							) );
+							return true;
+						} else {
+							self::log_message( 'warning', sprintf( __( 'Failed to add product ID %d to cart.', 'wc-sc-debugger' ), $product_id ) );
+							return false;
+						}
+					} else {
+						$reasons = array();
+						if ( ! $product->is_purchasable() ) {
+							$reasons[] = __( 'not purchasable', 'wc-sc-debugger' );
+						}
+						if ( ! $product->is_in_stock() ) {
+							$reasons[] = __( 'out of stock', 'wc-sc-debugger' );
+						}
+						self::log_message( 'warning', sprintf( 
+							__( 'Product ID %d cannot be added to cart: %s.', 'wc-sc-debugger' ), 
+							$product_id,
+							implode( ', ', $reasons )
+						) );
+						return false;
+					}
 				}
 			} catch ( Exception $e ) {
-				self::log_message( 'error', sprintf( __( 'An exception occurred during coupon application: %s', 'wc-sc-debugger' ), $e->getMessage() ) );
-				$coupon_applied = false;
+				self::log_message( 'error', sprintf( 
+					__( 'Error adding product to cart: %s', 'wc-sc-debugger' ), 
+					$e->getMessage() 
+				) );
+				return false;
 			}
-
-			// Restore original state.
-			WC()->cart->empty_cart( true );
-			foreach ( $original_cart_contents as $cart_item_key => $cart_item ) {
-				$product_to_restore = wc_get_product( $cart_item['product_id'] );
-				if ( $product_to_restore && $product_to_restore->exists() ) {
-					WC()->cart->add_to_cart( $cart_item['product_id'], $cart_item['quantity'], $cart_item['variation_id'], $cart_item['variation'], $cart_item['data'] ?? array() );
-				}
-			}
-
-			// Restore session data using the correct modern method.
-			if ( WC()->session ) {
-				foreach ( $original_session_data as $key => $value ) {
-					WC()->session->set( $key, $value );
-				}
-				// After restoring the session, make sure our backed-up notices are in place,
-				// as session restoration can sometimes be imperfect with complex data types.
-				WC()->session->set( 'wc_notices', $original_notices );
-			}
-
-			// Restore applied coupons.
-			foreach ( $original_applied_coupons as $applied_coupon_code ) {
-				WC()->cart->apply_coupon( $applied_coupon_code );
-			}
-
-			wp_set_current_user( $original_user_id );
-			WC()->cart->calculate_totals();
-
-			return $coupon_applied;
 		}
 
 		/**
@@ -727,24 +1168,33 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		private function get_or_create_dummy_product() {
 			$product_id = get_option( 'wc_sc_debugger_dummy_product_id' );
 
-			if ( $product_id && ( $product = wc_get_product( $product_id ) ) && $product->exists() ) {
-				return $product_id;
+			if ( $product_id ) {
+				$product = wc_get_product( $product_id );
+				if ( $product && $product->exists() ) {
+					return $product_id;
+				}
 			}
 
-			$new_product = new WC_Product_Simple();
-			$new_product->set_name( 'Debugger Dummy Product' );
-			$new_product->set_status( 'private' );
-			$new_product->set_catalog_visibility( 'hidden' );
-			$new_product->set_price( 100 );
-			$new_product->set_regular_price( 100 );
-			$new_product->set_manage_stock( false );
-			$new_product->set_virtual( true );
+			// Create a new dummy product
+			try {
+				$new_product = new WC_Product_Simple();
+				$new_product->set_name( 'Debugger Test Product' );
+				$new_product->set_status( 'private' );
+				$new_product->set_catalog_visibility( 'hidden' );
+				$new_product->set_price( 100 );
+				$new_product->set_regular_price( 100 );
+				$new_product->set_manage_stock( false );
+				$new_product->set_stock_status( 'instock' );
+				$new_product->set_virtual( true );
 
-			$new_product_id = $new_product->save();
+				$new_product_id = $new_product->save();
 
-			if ( $new_product_id ) {
-				update_option( 'wc_sc_debugger_dummy_product_id', $new_product_id );
-				return $new_product_id;
+				if ( $new_product_id ) {
+					update_option( 'wc_sc_debugger_dummy_product_id', $new_product_id );
+					return $new_product_id;
+				}
+			} catch ( Exception $e ) {
+				error_log( 'WC SC Debugger: Failed to create dummy product - ' . $e->getMessage() );
 			}
 
 			return false;
@@ -753,7 +1203,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 	} // End class WC_SC_Debugger.
 
 	// Initialize the plugin.
-	WC_SC_Debugger::get_instance();
+	add_action( 'plugins_loaded', function() {
+		if ( class_exists( 'WooCommerce' ) ) {
+			WC_SC_Debugger::get_instance();
+		}
+	}, 11 );
 
 	/**
 	 * Activation hook.
@@ -768,6 +1222,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 	 */
 	register_deactivation_hook( __FILE__, 'wc_sc_debugger_deactivate' );
 	function wc_sc_debugger_deactivate() {
+		// Clean up dummy product
+		$product_id = get_option( 'wc_sc_debugger_dummy_product_id' );
+		if ( $product_id ) {
+			wp_delete_post( $product_id, true );
+		}
 		delete_option( 'wc_sc_debugger_dummy_product_id' );
 	}
 
