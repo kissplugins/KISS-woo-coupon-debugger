@@ -6,109 +6,21 @@ This document outlines planned features and improvements for future versions of 
 
 Looking at this WooCommerce coupon debugger plugin, I've identified 3 critical issues that should be addressed for security and performance:
 
-## 1. **Unbounded Memory Usage and Potential DoS** (Critical)
+## 1. ✅ Unbounded Memory Usage and Potential DoS (Fixed)
 
-**Location**: `log_message()` function in `kiss-coupon-debugger.php`
+Location: log_message() in kiss-coupon-debugger.php
 
-**Issue**: The debug message array can grow indefinitely with only a soft limit of 1000 messages:
+- Implemented a hard cap at 1000 messages; new logs are dropped once the limit is reached
+- Truncate message strings to 1000 characters
+- Cap data payload size at ~10KB (fallback to small sentinel)
 
-```php
-public static function log_message( $type, $message, $data = array() ) {
-    // Prevent excessive logging
-    if ( count( self::$debug_messages ) > 1000 ) {
-        self::$debug_messages[] = array(
-            'type'    => 'warning',
-            'message' => __( 'Debug message limit reached. Some messages may be omitted.', 'wc-sc-debugger' ),
-            'data'    => array(),
-        );
-        return; // This doesn't actually stop logging - it adds another message!
-    }
-```
+## 2. ✅ Infinite Recursion in Object Sanitization (Fixed)
 
-**Problems**:
-- The limit check adds a message but doesn't prevent further messages
-- No limits on individual message size
-- Complex object serialization in `sanitize_for_logging()` can consume massive memory
-- Potential for memory exhaustion attacks
+Location: sanitize_for_logging() function
 
-**Fix**:
-```php
-public static function log_message( $type, $message, $data = array() ) {
-    if ( count( self::$debug_messages ) >= 1000 ) {
-        return; // Hard stop at limit
-    }
-    
-    // Limit individual message data size
-    if ( is_array( $data ) && strlen( json_encode( $data ) ) > 10240 ) { // 10KB limit
-        $data = array( 'message' => 'Data too large to log' );
-    }
-    
-    self::$debug_messages[] = array(
-        'type'    => $type,
-        'message' => substr( $message, 0, 1000 ), // Limit message length
-        'data'    => $data,
-    );
-}
-```
-
-## 2. **Infinite Recursion in Object Sanitization** (High)
-
-**Location**: `sanitize_for_logging()` function
-
-**Issue**: The circular reference detection is flawed and can lead to infinite loops:
-
-```php
-private function sanitize_for_logging( $data, $depth = 0, &$stack = array() ) {
-    if ( $depth > 3 ) {
-        return '[Max Depth Reached]';
-    }
-
-    if ( is_object( $data ) ) {
-        $hash = spl_object_hash( $data );
-        if ( isset( $stack[ $hash ] ) ) {
-            return sprintf( '[Circular Reference: %s]', get_class( $data ) );
-        }
-        $stack[ $hash ] = true;
-        
-        // ... processing ...
-        
-        unset( $stack[ $hash ] ); // This allows the same object to be processed again!
-        return $result;
-    }
-}
-```
-
-**Problems**:
-- Unsetting from stack allows infinite recursion with complex object graphs
-- No timeout protection
-- Can cause PHP fatal errors or memory exhaustion
-
-**Fix**:
-```php
-private function sanitize_for_logging( $data, $depth = 0, &$stack = array() ) {
-    if ( $depth > 2 ) { // Reduce max depth
-        return '[Max Depth Reached]';
-    }
-
-    if ( is_object( $data ) ) {
-        $hash = spl_object_hash( $data );
-        if ( isset( $stack[ $hash ] ) ) {
-            return sprintf( '[Circular Reference: %s]', get_class( $data ) );
-        }
-        $stack[ $hash ] = true;
-        
-        // ... processing ...
-        
-        // Don't unset - keep permanent record to prevent reprocessing
-        return $result;
-    }
-    
-    // Add array protection too
-    if ( is_array( $data ) && count( $data ) > 100 ) {
-        return '[Large Array - ' . count( $data ) . ' items]';
-    }
-}
-```
+- Reduced max traversal depth to 2
+- Fixed circular reference detection by keeping visited objects in the stack (no unset)
+- Added large array guard (returns a summary when count > 100)
 
 ## 3. **Inadequate AJAX Input Validation** (Medium-High)
 
