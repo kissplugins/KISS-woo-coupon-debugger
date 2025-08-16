@@ -1,0 +1,60 @@
+name: PHP Lint
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+
+jobs:
+  php-lint:
+    name: Lint PHP files
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+
+      - name: Show PHP version
+        run: php -v
+
+      - name: Lint all PHP files (excluding vendor and node_modules)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Find PHP files excluding common dependency directories
+          mapfile -d '' php_files < <(find . \
+            -type d \( -path './vendor' -o -path './node_modules' \) -prune -false -o \
+            -type f -name '*.php' -print0)
+
+          if [ ${#php_files[@]} -eq 0 ]; then
+            echo "No PHP files found to lint."
+            exit 0
+          fi
+
+          echo "Linting ${#php_files[@]} PHP files..."
+          # Run syntax check on each file
+          failed=0
+          for f in "${php_files[@]}"; do
+            if ! php -l "$f" > /dev/null; then
+              echo "Syntax error in: $f"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "PHP syntax check failed."
+            exit 1
+          fi
+
+          echo "All PHP files passed syntax check."
+
