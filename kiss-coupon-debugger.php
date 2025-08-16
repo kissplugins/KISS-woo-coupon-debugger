@@ -80,7 +80,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			add_action( 'admin_init', array( $this, 'register_settings' ) );
 			add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 			add_action( 'wp_ajax_wc_sc_debug_coupon', array( $this, 'handle_debug_coupon_ajax' ) );
-			
+
 			// Ensure WooCommerce session is initialized for AJAX requests
 			add_action( 'woocommerce_init', array( $this, 'maybe_init_session' ) );
 		}
@@ -105,6 +105,16 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'manage_woocommerce',
 				'wc-sc-debugger',
 				array( $this, 'render_admin_page' )
+			);
+
+			// Add a simple self-test page for internal safeguards
+			add_submenu_page(
+				'woocommerce',
+				__( 'SC Self Test', 'wc-sc-debugger' ),
+				__( 'SC Self Test', 'wc-sc-debugger' ),
+				'manage_woocommerce',
+				'wc-sc-debugger-self-test',
+				array( $this, 'render_self_test_page' )
 			);
 		}
 
@@ -248,7 +258,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/js/admin.js', __FILE__ ),
 				array( 'jquery', 'selectWoo' ),
-				'1.4.2',
+				self::VERSION,
 				true
 			);
 
@@ -258,6 +268,59 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				array(
 					'ajax_url'               => admin_url( 'admin-ajax.php' ),
 					'debug_coupon_nonce'     => wp_create_nonce( 'wc-sc-debug-coupon-nonce' ),
+
+			/**
+			 * Render the self-test admin page.
+			 */
+			public function render_self_test_page() {
+				$results = array();
+
+				// Test 1: log_message() hard cap and truncation
+				$ref = new ReflectionClass( __CLASS__ );
+				$prop = $ref->getProperty( 'debug_messages' );
+				$prop->setAccessible( true );
+				$prop->setValue( array() );
+				for ( $i = 0; $i < 1005; $i++ ) {
+					self::log_message( 'info', str_repeat( 'x', 1500 ), array( 'k' => str_repeat( 'y', 11000 ) ) );
+				}
+				$messages = $prop->getValue();
+				$results['log_cap_count'] = count( $messages ) === 1000;
+				$results['log_trunc_message'] = isset( $messages[0]['message'] ) && strlen( $messages[0]['message'] ) === 1000;
+				$results['log_data_cap'] = isset( $messages[0]['data'] ) && $messages[0]['data'] === array( 'message' => 'Data too large to log' );
+
+				// Test 2: sanitize_for_logging circular and depth
+				$method = new ReflectionMethod( $this, 'sanitize_for_logging' );
+				$method->setAccessible( true );
+				$a = new stdClass();
+				$b = new stdClass();
+				$a->b = $b; $b->a = $a;
+				$stack = array();
+				$first = $method->invoke( $this, $a, 0, $stack );
+				$circular = $method->invoke( $this, $a, 1, $stack );
+				$deep = array( 'l1' => array( 'l2' => array( 'l3' => array( 'l4' => 'x' ) ) ) );
+				$stack2 = array();
+				$deep_res = $method->invoke( $this, $deep, 0, $stack2 );
+				$results['sanitize_circular'] = is_string( $circular ) && strpos( $circular, '[Circular Reference:' ) === 0;
+				$results['sanitize_depth'] = isset( $deep_res['l1']['l2']['l3'] ) && $deep_res['l1']['l2']['l3'] === '[Max Depth Reached]';
+
+				?>
+				<div class="wrap woocommerce">
+					<h1><?php echo esc_html__( 'SC Self Test', 'wc-sc-debugger' ); ?></h1>
+					<p><?php esc_html_e( 'Basic checks for internal safeguards.', 'wc-sc-debugger' ); ?></p>
+					<table class="widefat striped">
+						<thead><tr><th><?php esc_html_e( 'Test', 'wc-sc-debugger' ); ?></th><th><?php esc_html_e( 'Result', 'wc-sc-debugger' ); ?></th></tr></thead>
+						<tbody>
+							<tr><td>log_message hard cap (1000)</td><td><?php echo $results['log_cap_count'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>log_message message truncation</td><td><?php echo $results['log_trunc_message'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>log_message data size cap</td><td><?php echo $results['log_data_cap'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>sanitize_for_logging circular guard</td><td><?php echo $results['sanitize_circular'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>sanitize_for_logging depth guard</td><td><?php echo $results['sanitize_depth'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+						</tbody>
+					</table>
+				</div>
+				<?php
+			}
+
 					'search_customers_nonce' => wp_create_nonce( 'search-customers' ),
 				)
 			);
@@ -368,7 +431,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		public function handle_debug_coupon_ajax() {
 			// Set execution time limit
 			@set_time_limit( $this->max_execution_time );
-			
+
 			// Verify nonce
 			check_ajax_referer( 'wc-sc-debug-coupon-nonce', 'security' );
 
@@ -440,7 +503,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 
 			} catch ( Exception $e ) {
 				error_log( 'WC SC Debugger AJAX Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine() );
-				
+
 				// Add more context to the error
 				$error_context = array(
 					'message' => $e->getMessage(),
@@ -448,11 +511,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					'line' => $e->getLine(),
 					'trace' => wp_debug_backtrace_summary()
 				);
-				
+
 				wp_send_json_error( array(
-					'message' => sprintf( 
-						__( 'An error occurred: %s. Please check your server error logs for more details.', 'wc-sc-debugger' ), 
-						$e->getMessage() 
+					'message' => sprintf(
+						__( 'An error occurred: %s. Please check your server error logs for more details.', 'wc-sc-debugger' ),
+						$e->getMessage()
 					),
 					'debug_info' => WP_DEBUG ? $error_context : null,
 				) );
@@ -467,14 +530,23 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @param array  $data    Optional data to include.
 		 */
 		public static function log_message( $type, $message, $data = array() ) {
-			// Prevent excessive logging
-			if ( count( self::$debug_messages ) > 1000 ) {
-				self::$debug_messages[] = array(
-					'type'    => 'warning',
-					'message' => __( 'Debug message limit reached. Some messages may be omitted.', 'wc-sc-debugger' ),
-					'data'    => array(),
-				);
+			// Hard cap: stop logging when limit is reached to prevent unbounded memory usage
+			if ( count( self::$debug_messages ) >= 1000 ) {
 				return;
+			}
+
+			// Ensure message is a string and limit its length
+			$message = (string) $message;
+			if ( strlen( $message ) > 1000 ) {
+				$message = substr( $message, 0, 1000 );
+			}
+
+			// Limit individual data payload size (approximate via JSON length)
+			if ( is_array( $data ) || is_object( $data ) ) {
+				$encoded = json_encode( $data );
+				if ( false === $encoded || strlen( $encoded ) > 10240 ) { // ~10KB
+					$data = array( 'message' => 'Data too large to log' );
+				}
 			}
 
 			self::$debug_messages[] = array(
@@ -491,7 +563,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			if ( $this->hooks_tracking_active ) {
 				return; // Prevent recursion
 			}
-			
+
 			$this->hooks_tracking_active = true;
 
 			// Core coupon validation filters
@@ -636,27 +708,27 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 * @return mixed Sanitized data.
 		 */
 		private function sanitize_for_logging( $data, $depth = 0, &$stack = array() ) {
-			// Limit recursion depth to prevent memory exhaustion.
-			if ( $depth > 3 ) {
+			// Tighter recursion depth to reduce risk of runaway traversal
+			if ( $depth > 2 ) {
 				return '[Max Depth Reached]';
 			}
 
 			if ( is_object( $data ) ) {
-				// Check for circular references.
+				// Circular reference protection using object identity
 				$hash = spl_object_hash( $data );
 				if ( isset( $stack[ $hash ] ) ) {
 					return sprintf( '[Circular Reference: %s]', get_class( $data ) );
 				}
-				$stack[ $hash ] = true;
+				$stack[ $hash ] = true; // Do not unset; keep record to prevent reprocessing
 
 				if ( method_exists( $data, 'to_array' ) ) {
 					$result = $this->sanitize_for_logging( $data->to_array(), $depth + 1, $stack );
 				} elseif ( $data instanceof WC_Coupon ) {
 					$result = array(
-						'type'        => 'WC_Coupon',
-						'id'          => $data->get_id(),
-						'code'        => $data->get_code(),
-						'amount'      => $data->get_amount(),
+						'type'          => 'WC_Coupon',
+						'id'            => $data->get_id(),
+						'code'          => $data->get_code(),
+						'amount'        => $data->get_amount(),
 						'discount_type' => $data->get_discount_type(),
 					);
 				} elseif ( $data instanceof WC_Product ) {
@@ -677,9 +749,13 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					$result = sprintf( '[Object: %s]', get_class( $data ) );
 				}
 
-				unset( $stack[ $hash ] );
 				return $result;
 			} elseif ( is_array( $data ) ) {
+				// Protect against extremely large arrays
+				$size = count( $data );
+				if ( $size > 100 ) {
+					return '[Large Array - ' . $size . ' items]';
+				}
 				$sanitized_array = array();
 				foreach ( $data as $key => $value ) {
 					$sanitized_array[ $key ] = $this->sanitize_for_logging( $value, $depth + 1, $stack );
@@ -689,6 +765,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				return '[Resource]';
 			}
 
+			// Scalars
 			return $data;
 		}
 
@@ -710,13 +787,13 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				$original_cart_contents = WC()->cart->get_cart_contents();
 				$original_applied_coupons = WC()->cart->get_applied_coupons();
 				$original_user_id = get_current_user_id();
-				
+
 				// Safely get session data
 				$original_session_data = array();
 				if ( WC()->session && method_exists( WC()->session, 'get_session_data' ) ) {
 					$original_session_data = WC()->session->get_session_data();
 				}
-				
+
 				// Safely backup notices
 				$original_notices = array();
 				if ( WC()->session ) {
@@ -899,7 +976,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					$variation_id = isset( $cart_item['variation_id'] ) ? $cart_item['variation_id'] : 0;
 					$variation = isset( $cart_item['variation'] ) && is_array( $cart_item['variation'] ) ? $cart_item['variation'] : array();
 					$cart_item_data = isset( $cart_item['data'] ) && is_array( $cart_item['data'] ) ? $cart_item['data'] : array();
-					
+
 					// Ensure we have a valid product ID
 					if ( $product_id ) {
 						WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation, $cart_item_data );
@@ -947,7 +1024,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 		 */
 		private function add_product_to_cart( $product_id ) {
 			$product = wc_get_product( $product_id );
-			
+
 			if ( ! $product ) {
 				self::log_message( 'warning', sprintf( __( 'Product ID %d not found.', 'wc-sc-debugger' ), $product_id ) );
 				return false;
@@ -957,20 +1034,20 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				// Handle variable products
 				if ( $product->is_type( 'variable' ) ) {
 					self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a variable product. Finding first available variation...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
-					
+
 					// Get available variations
 					$variations = $product->get_available_variations();
-					
+
 					if ( empty( $variations ) ) {
 						self::log_message( 'warning', sprintf( __( 'No available variations found for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
 						return false;
 					}
-					
+
 					// Find the first variation that's purchasable and in stock
 					foreach ( $variations as $variation_data ) {
 						$variation_id = $variation_data['variation_id'];
 						$variation = wc_get_product( $variation_id );
-						
+
 						if ( $variation && $variation->is_purchasable() && $variation->is_in_stock() ) {
 							// Get the variation attributes - ensure they're properly formatted
 							$variation_attributes = array();
@@ -980,10 +1057,10 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 									$variation_attributes[ (string) $attr_name ] = (string) $attr_value;
 								}
 							}
-							
+
 							// Add variation to cart - let WooCommerce handle the data structure
 							$cart_item_key = WC()->cart->add_to_cart( $product_id, 1, $variation_id, $variation_attributes );
-							
+
 							if ( $cart_item_key ) {
 								// Log the selected attributes
 								$attribute_string = '';
@@ -996,11 +1073,11 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 									}
 								}
 								$attribute_string = rtrim( $attribute_string, ', ' );
-								
-								self::log_message( 'success', sprintf( 
-									__( 'Added variable product to cart: %s (ID: %d, Variation ID: %d) - %s', 'wc-sc-debugger' ), 
-									$product->get_name(), 
-									$product_id, 
+
+								self::log_message( 'success', sprintf(
+									__( 'Added variable product to cart: %s (ID: %d, Variation ID: %d) - %s', 'wc-sc-debugger' ),
+									$product->get_name(),
+									$product_id,
 									$variation_id,
 									$attribute_string
 								) );
@@ -1008,14 +1085,14 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 							}
 						}
 					}
-					
+
 					self::log_message( 'warning', sprintf( __( 'No purchasable variations in stock for product ID %d.', 'wc-sc-debugger' ), $product_id ) );
 					return false;
-					
+
 				} elseif ( $product->is_type( 'grouped' ) ) {
 					// Handle grouped products
 					self::log_message( 'info', sprintf( __( 'Product "%s" (ID: %d) is a grouped product. Adding first available child product...', 'wc-sc-debugger' ), $product->get_name(), $product_id ) );
-					
+
 					$children = $product->get_children();
 					if ( ! empty( $children ) ) {
 						foreach ( $children as $child_id ) {
@@ -1023,30 +1100,30 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 							if ( $child_product && $child_product->is_purchasable() && $child_product->is_in_stock() ) {
 								$cart_item_key = WC()->cart->add_to_cart( $child_id );
 								if ( $cart_item_key ) {
-									self::log_message( 'success', sprintf( 
-										__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ), 
-										$child_product->get_name(), 
+									self::log_message( 'success', sprintf(
+										__( 'Added grouped product child to cart: %s (Child ID: %d from Parent ID: %d)', 'wc-sc-debugger' ),
+										$child_product->get_name(),
 										$child_id,
-										$product_id 
+										$product_id
 									) );
 									return true;
 								}
 							}
 						}
 					}
-					
+
 					self::log_message( 'warning', sprintf( __( 'No purchasable child products found for grouped product ID %d.', 'wc-sc-debugger' ), $product_id ) );
 					return false;
-					
+
 				} else {
 					// Handle simple products and other types
 					if ( $product->is_purchasable() && $product->is_in_stock() ) {
 						$cart_item_key = WC()->cart->add_to_cart( $product_id );
 						if ( $cart_item_key ) {
-							self::log_message( 'success', sprintf( 
-								__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ), 
-								$product->get_name(), 
-								$product_id 
+							self::log_message( 'success', sprintf(
+								__( 'Added product to cart: %s (ID: %d)', 'wc-sc-debugger' ),
+								$product->get_name(),
+								$product_id
 							) );
 							return true;
 						} else {
@@ -1061,8 +1138,8 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 						if ( ! $product->is_in_stock() ) {
 							$reasons[] = __( 'out of stock', 'wc-sc-debugger' );
 						}
-						self::log_message( 'warning', sprintf( 
-							__( 'Product ID %d cannot be added to cart: %s.', 'wc-sc-debugger' ), 
+						self::log_message( 'warning', sprintf(
+							__( 'Product ID %d cannot be added to cart: %s.', 'wc-sc-debugger' ),
 							$product_id,
 							implode( ', ', $reasons )
 						) );
@@ -1070,9 +1147,9 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					}
 				}
 			} catch ( Exception $e ) {
-				self::log_message( 'error', sprintf( 
-					__( 'Error adding product to cart: %s', 'wc-sc-debugger' ), 
-					$e->getMessage() 
+				self::log_message( 'error', sprintf(
+					__( 'Error adding product to cart: %s', 'wc-sc-debugger' ),
+					$e->getMessage()
 				) );
 				return false;
 			}
