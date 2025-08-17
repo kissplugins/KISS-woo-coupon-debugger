@@ -71,7 +71,20 @@ jQuery(document).ready(function($) {
                     displayDebugMessages(response.data.messages);
                 } else {
 
-	                    // JSON export block
+
+                // JSON export block
+                try {
+                    if (response && response.success) {
+                        var $jsonTools = $('#json_export_tools');
+                        var $jsonPre = $('#json_export_pre');
+                        $jsonPre.text(JSON.stringify({
+                            coupon_valid: !!(response.data && response.data.coupon_valid),
+                            messages: (response.data && response.data.messages) ? response.data.messages : []
+                        }, null, 2));
+                        $jsonTools.show();
+                    }
+                } catch (e) { console.warn('Failed to render JSON export', e); }
+
 	                    try {
 	                        var $jsonTools = $('#json_export_tools');
 	                        var $jsonPre = $('#json_export_pre');
@@ -111,6 +124,26 @@ jQuery(document).ready(function($) {
                 } else if (jqXHR.responseText) {
                     responseDetail = jqXHR.responseText;
                 }
+    // Copy JSON to clipboard
+    $(document).on('click', '#copy_json', function() {
+        var $pre = $('#json_export_pre');
+        if (!$pre.length) return;
+        var text = $pre.text();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function(){
+                alert('JSON copied to clipboard.');
+            }).catch(function(){ fallbackCopy(text); });
+        } else {
+            fallbackCopy(text);
+        }
+        function fallbackCopy(t){
+            var ta = document.createElement('textarea');
+            ta.value = t; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); alert('JSON copied to clipboard.'); } catch(e) {}
+            document.body.removeChild(ta);
+        }
+    });
+
 
                 if (responseDetail) {
                     var safeResponse = $('<div/>').text(responseDetail).html();
