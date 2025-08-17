@@ -29,5 +29,22 @@ interface SettingsRepositoryInterface {
      * @param array $products
      */
     public function setValidatedProducts(array $products): void;
+
+    /**
+     * Get last used parameters for the current user
+     * @return array
+     */
+    public function getLastUsedParams(): array;
+
+    /**
+     * Set last used parameters for the current user
+     * @param array $params
+     */
+    public function setLastUsedParams(array $params): void;
+
+    /**
+     * Clear last used parameters for the current user
+     */
+    public function clearLastUsedParams(): void;
 }
 

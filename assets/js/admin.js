@@ -8,6 +8,13 @@ jQuery(document).ready(function($) {
     var $debugResults = $('#debug_results');
     var $loadingIndicator = $('.loading-indicator');
 
+    // New elements for URL sharing and settings management
+    var $generateUrlButton = $('#generate_url');
+    var $clearAllSettingsButton = $('#clear_all_settings');
+    var $generatedUrlContainer = $('#generated_url_container');
+    var $generatedUrlInput = $('#generated_url');
+    var $copyUrlButton = $('#copy_url');
+
     // The product dropdown is a standard select, so it doesn't need SelectWoo initialization.
     // We only initialize SelectWoo for the customer search, which uses AJAX.
     $debugUserSelect.selectWoo({
@@ -40,6 +47,29 @@ jQuery(document).ready(function($) {
         placeholder: $(this).data('placeholder'),
         escapeMarkup: function (markup) { return markup; }
     });
+
+    // Load pre-selected user if specified
+    var selectedUserId = $debugUserSelect.data('selected-user-id');
+    if (selectedUserId && selectedUserId > 0) {
+        // Make AJAX call to get user details
+        $.ajax({
+            url: wcSCDebugger.ajax_url,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                action: 'woocommerce_json_search_customers',
+                term: '',
+                security: wcSCDebugger.search_customers_nonce,
+                include: [selectedUserId]
+            },
+            success: function(data) {
+                if (data && data[selectedUserId]) {
+                    var option = new Option(data[selectedUserId], selectedUserId, true, true);
+                    $debugUserSelect.append(option).trigger('change');
+                }
+            }
+        });
+    }
 
     $runDebugButton.on('click', function() {
         var couponCode = $couponCodeInput.val().trim();
@@ -130,6 +160,85 @@ jQuery(document).ready(function($) {
         $couponCodeInput.val('');
         $debugProductsSelect.val('').trigger('change');
         $debugUserSelect.val(null).trigger('change');
+    });
+
+    // Generate shareable URL
+    $generateUrlButton.on('click', function() {
+        var couponCode = $couponCodeInput.val().trim();
+        var productId = $debugProductsSelect.val();
+        var userId = $debugUserSelect.val();
+        var skipSmartCoupons = $skipSmartCoupons.is(':checked');
+
+        var params = [];
+        if (couponCode) {
+            params.push('coupon_code=' + encodeURIComponent(couponCode));
+        }
+        if (productId) {
+            params.push('product_id=' + encodeURIComponent(productId));
+        }
+        if (userId) {
+            params.push('user_id=' + encodeURIComponent(userId));
+        }
+        if (skipSmartCoupons) {
+            params.push('skip_smart_coupons=1');
+        }
+
+        var url = wcSCDebugger.admin_url;
+        if (params.length > 0) {
+            url += '&' + params.join('&');
+        }
+
+        $generatedUrlInput.val(url);
+        $generatedUrlContainer.show();
+    });
+
+    // Copy URL to clipboard
+    $copyUrlButton.on('click', function() {
+        $generatedUrlInput.select();
+        document.execCommand('copy');
+
+        // Show feedback
+        var originalText = $copyUrlButton.text();
+        $copyUrlButton.text('Copied!');
+        setTimeout(function() {
+            $copyUrlButton.text(originalText);
+        }, 2000);
+    });
+
+    // Clear all settings
+    $clearAllSettingsButton.on('click', function() {
+        if (!confirm('Are you sure you want to clear all settings? This will reset all form fields and clear your saved preferences.')) {
+            return;
+        }
+
+        $.ajax({
+            url: wcSCDebugger.ajax_url,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                action: 'wc_sc_clear_settings',
+                security: wcSCDebugger.debug_coupon_nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Clear all form fields
+                    $couponCodeInput.val('');
+                    $debugProductsSelect.val('').trigger('change');
+                    $debugUserSelect.val(null).trigger('change');
+                    $skipSmartCoupons.prop('checked', false);
+                    $generatedUrlContainer.hide();
+                    $debugResults.empty().append('<p>Enter a coupon code and click "Run Debug" to see the processing details.</p>');
+
+                    // Show success message
+                    alert('All settings cleared successfully!');
+                } else {
+                    alert('Error clearing settings: ' + (response.data.message || 'Unknown error'));
+                }
+            },
+            error: function() {
+                alert('Error clearing settings. Please try again.');
+            }
+        });
     });
 
     /**

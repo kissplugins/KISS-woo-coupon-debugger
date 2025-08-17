@@ -3,7 +3,7 @@
  * Plugin Name: KISS Woo Coupon Debugger
  * Plugin URI:  https://github.com/kissplugins/KISS-woo-coupon-debugger
  * Description: A companion plugin for WooCommerce Smart Coupons to debug coupon application and hook/filter processing.
- * Version:     2.0.0
+ * Version:     2.0.1
  * Author:      KISS Plugins
  * Author URI:  https://kissplugins.com
  * License:     GPL-3.0+

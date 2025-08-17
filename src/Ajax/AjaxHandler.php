@@ -44,6 +44,7 @@ class AjaxHandler {
      */
     public function init(): void {
         add_action('wp_ajax_wc_sc_debug_coupon', [$this, 'handleDebugCouponAjax']);
+        add_action('wp_ajax_wc_sc_clear_settings', [$this, 'handleClearSettingsAjax']);
     }
 
     /**
@@ -71,6 +72,9 @@ class AjaxHandler {
             if (is_wp_error($input)) {
                 wp_send_json_error(['message' => $input->get_error_message()]);
             }
+
+            // Save last used parameters
+            $this->saveLastUsedParameters($input);
 
             // Clear previous debug messages
             $this->debugger->clearDebugMessages();
@@ -277,6 +281,57 @@ class AjaxHandler {
 
             // Re-throw the exception to be handled by the main error handler
             throw $e;
+        }
+    }
+
+    /**
+     * Save last used parameters for the current user
+     *
+     * @param array $input Validated input parameters
+     * @return void
+     */
+    private function saveLastUsedParameters(array $input): void {
+        $params = [
+            'coupon_code' => $input['coupon_code'],
+            'product_id' => !empty($input['product_ids']) ? $input['product_ids'][0] : 0,
+            'user_id' => $input['user_id'],
+            'skip_smart_coupons' => !empty($input['skip_smart_coupons']),
+        ];
+
+        $this->settings->setLastUsedParams($params);
+    }
+
+    /**
+     * Handle AJAX request for clearing all settings
+     *
+     * @return void
+     */
+    public function handleClearSettingsAjax(): void {
+        try {
+            // Verify nonce
+            check_ajax_referer('wc-sc-debug-coupon-nonce', 'security');
+
+            // Check permissions
+            if (!current_user_can('manage_woocommerce')) {
+                wp_send_json_error([
+                    'message' => __('You do not have permission to perform this action.', 'wc-sc-debugger')
+                ]);
+            }
+
+            // Clear last used parameters
+            $this->settings->clearLastUsedParams();
+
+            wp_send_json_success([
+                'message' => __('All settings cleared successfully.', 'wc-sc-debugger')
+            ]);
+
+        } catch (Exception $e) {
+            wp_send_json_error([
+                'message' => sprintf(
+                    __('Error clearing settings: %s', 'wc-sc-debugger'),
+                    $e->getMessage()
+                )
+            ]);
         }
     }
 
