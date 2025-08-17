@@ -332,7 +332,7 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				'wc-sc-debugger-admin',
 				plugins_url( 'assets/css/admin.css', __FILE__ ),
 				array(),
-				'1.4.2'
+				self::VERSION
 			);
 		}
 
