@@ -1,3 +1,6 @@
+# Note
+Un-resolved Crash on Activation
+
 # KISS Woo Coupon Debugger
 
 A companion plugin for WooCommerce Smart Coupons that helps debug coupon application issues and track hook/filter processing in real-time.
