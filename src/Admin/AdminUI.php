@@ -8,6 +8,7 @@
 namespace KissPlugins\WooCouponDebugger\Admin;
 
 use KissPlugins\WooCouponDebugger\Interfaces\AdminInterface as AdminContract;
+use KissPlugins\WooCouponDebugger\Interfaces\SettingsRepositoryInterface;
 
 /**
  * Handles admin interface and pages
@@ -22,12 +23,21 @@ class AdminUI implements AdminContract {
     private $version;
 
     /**
+     * Settings repository
+     *
+     * @var SettingsRepositoryInterface
+     */
+    private $settings;
+
+    /**
      * Constructor
      *
      * @param string $version Plugin version
+     * @param SettingsRepositoryInterface $settings Settings repository
      */
-    public function __construct(string $version = '1.3.0') {
+    public function __construct(string $version = '1.3.0', SettingsRepositoryInterface $settings = null) {
         $this->version = $version;
+        $this->settings = $settings;
     }
 
     /**
@@ -212,6 +222,7 @@ class AdminUI implements AdminContract {
                 'ajax_url'               => admin_url('admin-ajax.php'),
                 'debug_coupon_nonce'     => wp_create_nonce('wc-sc-debug-coupon-nonce'),
                 'search_customers_nonce' => wp_create_nonce('search-customers'),
+                'admin_url'              => admin_url('admin.php?page=wc-sc-debugger'),
             ]
         );
 
@@ -256,15 +267,39 @@ class AdminUI implements AdminContract {
 
     public function renderAdminPage(): void {
         $validated_products = get_option('wc_sc_debugger_validated_products', []);
+
+        // Get parameters from URL or last used parameters
+        $params = $this->getPageParameters();
+
         ?>
         <div class="wrap woocommerce">
             <h1><?php esc_html_e('WooCommerce Smart Coupons Debugger', 'wc-sc-debugger'); ?></h1>
 
             <div class="wc-sc-debugger-container">
                 <div class="wc-sc-debugger-form">
+                    <!-- URL Sharing Section -->
+                    <div class="form-field url-sharing-section">
+                        <label><?php esc_html_e('Share Configuration:', 'wc-sc-debugger'); ?></label>
+                        <div class="url-sharing-controls">
+                            <button id="generate_url" class="button button-secondary" type="button">
+                                <?php esc_html_e('Generate Shareable URL', 'wc-sc-debugger'); ?>
+                            </button>
+                            <button id="clear_all_settings" class="button button-secondary" type="button">
+                                <?php esc_html_e('Clear All Settings', 'wc-sc-debugger'); ?>
+                            </button>
+                        </div>
+                        <div id="generated_url_container" style="display: none;">
+                            <input type="text" id="generated_url" class="regular-text" readonly />
+                            <button id="copy_url" class="button button-secondary" type="button">
+                                <?php esc_html_e('Copy URL', 'wc-sc-debugger'); ?>
+                            </button>
+                        </div>
+                        <p class="description"><?php esc_html_e('Generate a URL with current settings that can be shared or bookmarked.', 'wc-sc-debugger'); ?></p>
+                    </div>
+
                     <div class="form-field">
                         <label for="coupon_code"><?php esc_html_e('Coupon Code:', 'wc-sc-debugger'); ?></label>
-                        <input type="text" id="coupon_code" name="coupon_code" placeholder="<?php esc_attr_e('Enter coupon code', 'wc-sc-debugger'); ?>" class="regular-text" />
+                        <input type="text" id="coupon_code" name="coupon_code" placeholder="<?php esc_attr_e('Enter coupon code', 'wc-sc-debugger'); ?>" class="regular-text" value="<?php echo esc_attr($params['coupon_code']); ?>" />
                     </div>
 
                     <div class="form-field">
@@ -274,9 +309,11 @@ class AdminUI implements AdminContract {
                             <?php
                             foreach ((array) $validated_products as $key => $product_data) {
                                 if (!empty($product_data['id'])) {
+                                    $selected = ($params['product_id'] == $product_data['id']) ? 'selected' : '';
                                     printf(
-                                        '<option value="%d">%s (ID: %d)</option>',
+                                        '<option value="%d" %s>%s (ID: %d)</option>',
                                         esc_attr($product_data['id']),
+                                        $selected,
                                         esc_html($product_data['name']),
                                         esc_html($product_data['id'])
                                     );
@@ -289,13 +326,13 @@ class AdminUI implements AdminContract {
 
                     <div class="form-field">
                         <label for="debug_user"><?php esc_html_e('Select User (optional):', 'wc-sc-debugger'); ?></label>
-                        <select id="debug_user" name="debug_user" class="wc-customer-search" data-placeholder="<?php esc_attr_e('Search for a customer&hellip;', 'wc-sc-debugger'); ?>" data-action="woocommerce_json_search_customers"></select>
+                        <select id="debug_user" name="debug_user" class="wc-customer-search" data-placeholder="<?php esc_attr_e('Search for a customer&hellip;', 'wc-sc-debugger'); ?>" data-action="woocommerce_json_search_customers" data-selected-user-id="<?php echo esc_attr($params['user_id']); ?>"></select>
                         <p class="description"><?php esc_html_e('Select a user to test user-specific coupon restrictions (e.g., "for new user only"). Leave empty for guest user.', 'wc-sc-debugger'); ?></p>
                     </div>
 
                         <div class="field-group">
                             <label>
-                                <input type="checkbox" id="skip_smart_coupons" />
+                                <input type="checkbox" id="skip_smart_coupons" <?php checked($params['skip_smart_coupons']); ?> />
                                 <?php esc_html_e('Skip Smart Coupons stack (simulate)', 'wc-sc-debugger'); ?>
                             </label>
                             <p class="description"><?php esc_html_e('If Smart Coupons triggers PHP 8+ errors, skip its discount application and simulate discount so other constraints can still be evaluated.', 'wc-sc-debugger'); ?></p>
@@ -317,6 +354,45 @@ class AdminUI implements AdminContract {
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Get parameters from URL or last used parameters
+     *
+     * @return array
+     */
+    private function getPageParameters(): array {
+        // Default parameters
+        $params = [
+            'coupon_code' => '',
+            'product_id' => 0,
+            'user_id' => 0,
+            'skip_smart_coupons' => false,
+        ];
+
+        // Check for URL parameters first
+        if (isset($_GET['coupon_code'])) {
+            $params['coupon_code'] = sanitize_text_field(wp_unslash($_GET['coupon_code']));
+        }
+        if (isset($_GET['product_id'])) {
+            $params['product_id'] = absint($_GET['product_id']);
+        }
+        if (isset($_GET['user_id'])) {
+            $params['user_id'] = absint($_GET['user_id']);
+        }
+        if (isset($_GET['skip_smart_coupons'])) {
+            $params['skip_smart_coupons'] = (bool) $_GET['skip_smart_coupons'];
+        }
+
+        // If no URL parameters and we have settings repository, load last used parameters
+        if (empty($params['coupon_code']) && empty($params['product_id']) && empty($params['user_id']) && $this->settings) {
+            $last_used = $this->settings->getLastUsedParams();
+            if (!empty($last_used)) {
+                $params = array_merge($params, $last_used);
+            }
+        }
+
+        return $params;
     }
 
     public function renderSettingsPage(): void {

@@ -55,8 +55,8 @@ class ServiceProvider {
         });
 
         // Concrete classes
-        $container->singleton(AdminContract::class, function () {
-            return new AdminUI($this->version);
+        $container->singleton(AdminContract::class, function ($c) {
+            return new AdminUI($this->version, $c->get(SettingsRepositoryInterface::class));
         });
 
         $container->singleton(AjaxHandler::class, function ($c) {
