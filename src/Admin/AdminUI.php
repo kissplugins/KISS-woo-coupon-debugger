@@ -317,7 +317,7 @@ class AdminUI implements AdminContract {
         ?>
         <!-- WC SC Debugger: Page rendered at <?php echo esc_html(current_time('Y-m-d H:i:s')); ?> with params: <?php echo esc_html(print_r($params, true)); ?> -->
         <div class="wrap woocommerce">
-            <h1><?php esc_html_e('WooCommerce Smart Coupons Debugger', 'wc-sc-debugger'); ?></h1>
+            <h1><?php esc_html_e('KISS Coupon Debugger', 'wc-sc-debugger'); ?></h1>
 
             <div class="wc-sc-debugger-container">
                 <div class="wc-sc-debugger-form">
@@ -479,7 +479,7 @@ class AdminUI implements AdminContract {
     public function renderSettingsPage(): void {
         ?>
         <div class="wrap woocommerce">
-            <h1><?php esc_html_e('WooCommerce Smart Coupons Debugger Settings', 'wc-sc-debugger'); ?></h1>
+            <h1><?php esc_html_e('KISS Coupon Debugger Settings', 'wc-sc-debugger'); ?></h1>
             <form method="post" action="options.php">
                 <?php
                 settings_fields('wc_sc_debugger_options_group');
