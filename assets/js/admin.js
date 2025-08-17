@@ -1,5 +1,16 @@
+// Basic script loading check - this should appear immediately when file loads
+console.log('WC SC Debugger: admin.js file loaded at ' + new Date().toISOString());
+console.log('WC SC Debugger: Script URL should be accessible at: ' + (window.location.origin + '/wp-content/plugins/KISS-woo-coupon-debugger/assets/js/admin.js'));
+
+// Test if jQuery is available
+if (typeof jQuery !== 'undefined') {
+    console.log('WC SC Debugger: jQuery is available, version: ' + jQuery.fn.jquery);
+} else {
+    console.error('WC SC Debugger: jQuery is NOT available!');
+}
+
 jQuery(document).ready(function($) {
-    console.log('WC SC Debugger: JavaScript loaded and DOM ready');
+    console.log('WC SC Debugger: JavaScript loaded and DOM ready at ' + new Date().toISOString());
 
     var $couponCodeInput = $('#coupon_code');
     var $debugProductsSelect = $('#debug_products_select');

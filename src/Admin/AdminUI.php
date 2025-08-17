@@ -193,6 +193,9 @@ class AdminUI implements AdminContract {
     }
 
     public function enqueueAdminScripts(string $hook): void {
+        // Debug: Log script enqueue attempt
+        error_log('WC SC Debugger: enqueueAdminScripts called with hook: ' . $hook);
+
         // Enqueue changelog scripts on plugins page
         global $pagenow;
         if ('plugins.php' === $pagenow) {
@@ -201,19 +204,28 @@ class AdminUI implements AdminContract {
         }
 
         if ('woocommerce_page_wc-sc-debugger' !== $hook && 'woocommerce_page_wc-sc-debugger-settings' !== $hook) {
+            error_log('WC SC Debugger: Hook does not match our pages: ' . $hook);
             return;
         }
+
+        error_log('WC SC Debugger: Proceeding to enqueue scripts for hook: ' . $hook);
 
         wp_enqueue_script('selectWoo');
         wp_enqueue_style('select2');
 
+        $script_url = plugins_url('assets/js/admin.js', WC_SC_DEBUGGER_PLUGIN_FILE);
+        error_log('WC SC Debugger: Enqueuing script from URL: ' . $script_url);
+        error_log('WC SC Debugger: Script version: ' . $this->version);
+
         wp_enqueue_script(
             'wc-sc-debugger-admin',
-            plugins_url('assets/js/admin.js', WC_SC_DEBUGGER_PLUGIN_FILE),
+            $script_url,
             ['jquery', 'selectWoo'],
             $this->version,
             true
         );
+
+        error_log('WC SC Debugger: Script enqueued successfully');
 
         $localize_data = [
             'ajax_url'               => admin_url('admin-ajax.php'),
@@ -271,12 +283,15 @@ class AdminUI implements AdminContract {
     }
 
     public function renderAdminPage(): void {
+        error_log('WC SC Debugger: renderAdminPage called');
+
         $validated_products = get_option('wc_sc_debugger_validated_products', []);
 
         // Get parameters from URL or last used parameters
         $params = $this->getPageParameters();
 
         ?>
+        <!-- WC SC Debugger: Page rendered at <?php echo esc_html(current_time('Y-m-d H:i:s')); ?> with params: <?php echo esc_html(print_r($params, true)); ?> -->
         <div class="wrap woocommerce">
             <h1><?php esc_html_e('WooCommerce Smart Coupons Debugger', 'wc-sc-debugger'); ?></h1>
 
