@@ -1,16 +1,35 @@
 // Basic script loading check - this should appear immediately when file loads
 console.log('WC SC Debugger: admin.js file loaded at ' + new Date().toISOString());
-console.log('WC SC Debugger: Script URL should be accessible at: ' + (window.location.origin + '/wp-content/plugins/KISS-woo-coupon-debugger/assets/js/admin.js'));
+
+// Debug function to check if debug mode is enabled
+function wcSCDebugLog(message, data) {
+    // Always show critical errors
+    if (message.includes('ERROR') || message.includes('CRITICAL')) {
+        console.error(message, data || '');
+        return;
+    }
+
+    // Check if debug mode is enabled
+    if (typeof wcSCDebugger !== 'undefined' && wcSCDebugger.debug_mode) {
+        if (data !== undefined) {
+            console.log(message, data);
+        } else {
+            console.log(message);
+        }
+    }
+}
+
+wcSCDebugLog('WC SC Debugger: Script URL should be accessible at: ' + (window.location.origin + '/wp-content/plugins/KISS-woo-coupon-debugger/assets/js/admin.js'));
 
 // Test if jQuery is available
 if (typeof jQuery !== 'undefined') {
-    console.log('WC SC Debugger: jQuery is available, version: ' + jQuery.fn.jquery);
+    wcSCDebugLog('WC SC Debugger: jQuery is available, version: ' + jQuery.fn.jquery);
 } else {
-    console.error('WC SC Debugger: jQuery is NOT available!');
+    console.error('WC SC Debugger: ERROR - jQuery is NOT available!');
 }
 
 jQuery(document).ready(function($) {
-    console.log('WC SC Debugger: JavaScript loaded and DOM ready at ' + new Date().toISOString());
+    wcSCDebugLog('WC SC Debugger: JavaScript loaded and DOM ready at ' + new Date().toISOString());
 
     var $couponCodeInput = $('#coupon_code');
     var $debugProductsSelect = $('#debug_products_select');
@@ -29,7 +48,7 @@ jQuery(document).ready(function($) {
     var $copyUrlButton = $('#copy_url');
 
     // Debug: Check if all elements are found
-    console.log('WC SC Debugger: Element availability check:', {
+    wcSCDebugLog('WC SC Debugger: Element availability check:', {
         'couponCodeInput': $couponCodeInput.length,
         'debugProductsSelect': $debugProductsSelect.length,
         'debugUserSelect': $debugUserSelect.length,
@@ -47,9 +66,9 @@ jQuery(document).ready(function($) {
 
     // Debug: Check wcSCDebugger object
     if (typeof wcSCDebugger !== 'undefined') {
-        console.log('WC SC Debugger: wcSCDebugger object available:', wcSCDebugger);
+        wcSCDebugLog('WC SC Debugger: wcSCDebugger object available:', wcSCDebugger);
     } else {
-        console.error('WC SC Debugger: wcSCDebugger object not found! This may indicate a script loading issue.');
+        console.error('WC SC Debugger: CRITICAL ERROR - wcSCDebugger object not found! This may indicate a script loading issue.');
     }
 
     // The product dropdown is a standard select, so it doesn't need SelectWoo initialization.

@@ -5,6 +5,46 @@ All notable changes to the KISS Woo Coupon Debugger plugin will be documented in
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-08-17
+
+### 🔗 URL Sharing & Parameter Persistence
+
+#### Added
+- **Shareable URLs**: Generate URLs with coupon, product ID, user ID, and settings parameters that can be shared or bookmarked
+- **Parameter Persistence**: Automatically remember and restore last used parameters for each user
+- **Clear All Settings**: One-click button to reset all form fields and clear saved preferences
+- **Smart Parameter Loading**: Automatically loads parameters from URL or restores last used settings
+- **Copy to Clipboard**: Easy URL copying with visual feedback
+
+#### Enhanced
+- **User Experience**: Form fields now pre-populate with previous values for faster testing
+- **Collaboration**: Team members can share specific test configurations via URLs
+- **Workflow Efficiency**: No need to re-enter the same test parameters repeatedly
+
+#### Technical
+- **Settings Repository**: Extended with user-specific parameter storage using WordPress user meta
+- **AJAX Endpoints**: Added clear settings functionality with proper nonce verification
+- **URL Generation**: Client-side URL building with proper parameter encoding
+- **Responsive Design**: Mobile-friendly layout for new UI elements
+
+### 🐛 Debug System & Troubleshooting
+
+#### Added
+- **Comprehensive Debug Logging**: Detailed console and error log messages for troubleshooting
+- **Debug Mode Toggle**: Settings option to enable/disable debug logging for production use
+- **Environment Diagnostics**: Debug check script for server environment validation
+- **Smart Debug Control**: Multiple ways to enable debug mode (settings, URL parameter, WP_DEBUG)
+
+#### Enhanced
+- **Performance Optimized**: Debug logging only active when enabled (zero overhead in production)
+- **Error Visibility**: Critical errors always logged regardless of debug mode
+- **Troubleshooting Tools**: Browser console and server log integration for issue diagnosis
+
+#### Technical
+- **Conditional Logging**: Debug messages only processed when debug mode is active
+- **Multiple Debug Triggers**: Settings toggle, URL parameter, or WordPress debug mode
+- **Production Safe**: Default disabled state ensures no performance impact
+
 ## [2.0.0] - 2025-08-13
 
 ### Phase 2 (1.5b): Smart Coupons Resilience and Simulation
