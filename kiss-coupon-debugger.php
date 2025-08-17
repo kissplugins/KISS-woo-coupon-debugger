@@ -268,6 +268,9 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 				array(
 					'ajax_url'               => admin_url( 'admin-ajax.php' ),
 					'debug_coupon_nonce'     => wp_create_nonce( 'wc-sc-debug-coupon-nonce' ),
+					'search_customers_nonce' => wp_create_nonce( 'search-customers' ),
+				)
+			);
 
 			/**
 			 * Render the self-test admin page.
@@ -396,6 +399,12 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 					<div class="wc-sc-debugger-output">
 						<h2><?php esc_html_e( 'Debugging Output', 'wc-sc-debugger' ); ?></h2>
 						<div id="debug_results" class="debug-results">
+						<div id="json_export_tools" class="json-export-tools" style="display:none; margin-top: 16px;">
+							<h2><?php esc_html_e( 'JSON Export', 'wc-sc-debugger' ); ?></h2>
+							<p class="description"><?php esc_html_e( 'Copy the raw JSON to share or analyze with external tools.', 'wc-sc-debugger' ); ?></p>
+							<p><button id="copy_json" class="button"><?php esc_html_e( 'Copy JSON', 'wc-sc-debugger' ); ?></button></p>
+							<pre id="json_export_pre" class="json-export" style="max-height: 300px; overflow: auto; background: #f6f8fa; padding: 10px; border: 1px solid #ddd;"></pre>
+						</div>
 							<p><?php esc_html_e( 'Enter a coupon code and click "Run Debug" to see the processing details.', 'wc-sc-debugger' ); ?></p>
 						</div>
 						<div class="loading-indicator" style="display: none;">

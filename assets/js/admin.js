@@ -70,6 +70,18 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     displayDebugMessages(response.data.messages);
                 } else {
+
+	                    // JSON export block
+	                    try {
+	                        var $jsonTools = $('#json_export_tools');
+	                        var $jsonPre = $('#json_export_pre');
+	                        $jsonPre.text(JSON.stringify({
+	                            coupon_valid: !!(response.data && response.data.coupon_valid),
+	                            messages: (response.data && response.data.messages) ? response.data.messages : []
+	                        }, null, 2));
+	                        $jsonTools.show();
+	                    } catch (e) { console.warn('Failed to render JSON export', e); }
+
                     $debugResults.append('<div class="debug-message error">' + (response.data.message || 'An unknown error occurred.') + '</div>');
                 }
             },
