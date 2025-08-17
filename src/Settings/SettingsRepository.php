@@ -38,11 +38,16 @@ class SettingsRepository implements SettingsRepositoryInterface {
      */
     public function getLastUsedParams(): array {
         $user_id = get_current_user_id();
+        error_log('WC SC Debugger: Getting last used params for user ID: ' . $user_id);
+
         if (!$user_id) {
+            error_log('WC SC Debugger: No user ID found, returning empty array');
             return [];
         }
 
         $params = get_user_meta($user_id, self::OPT_LAST_USED_PARAMS, true);
+        error_log('WC SC Debugger: Retrieved last used params: ' . print_r($params, true));
+
         return is_array($params) ? $params : [];
     }
 
@@ -54,7 +59,11 @@ class SettingsRepository implements SettingsRepositoryInterface {
      */
     public function setLastUsedParams(array $params): void {
         $user_id = get_current_user_id();
+        error_log('WC SC Debugger: Setting last used params for user ID: ' . $user_id);
+        error_log('WC SC Debugger: Input params: ' . print_r($params, true));
+
         if (!$user_id) {
+            error_log('WC SC Debugger: No user ID found, cannot save params');
             return;
         }
 
@@ -66,7 +75,10 @@ class SettingsRepository implements SettingsRepositoryInterface {
             'skip_smart_coupons' => isset($params['skip_smart_coupons']) ? (bool) $params['skip_smart_coupons'] : false,
         ];
 
-        update_user_meta($user_id, self::OPT_LAST_USED_PARAMS, $sanitized_params);
+        error_log('WC SC Debugger: Sanitized params: ' . print_r($sanitized_params, true));
+
+        $result = update_user_meta($user_id, self::OPT_LAST_USED_PARAMS, $sanitized_params);
+        error_log('WC SC Debugger: Update user meta result: ' . ($result ? 'success' : 'failed'));
     }
 
     /**
@@ -76,11 +88,15 @@ class SettingsRepository implements SettingsRepositoryInterface {
      */
     public function clearLastUsedParams(): void {
         $user_id = get_current_user_id();
+        error_log('WC SC Debugger: Clearing last used params for user ID: ' . $user_id);
+
         if (!$user_id) {
+            error_log('WC SC Debugger: No user ID found, cannot clear params');
             return;
         }
 
-        delete_user_meta($user_id, self::OPT_LAST_USED_PARAMS);
+        $result = delete_user_meta($user_id, self::OPT_LAST_USED_PARAMS);
+        error_log('WC SC Debugger: Delete user meta result: ' . ($result ? 'success' : 'failed'));
     }
 }
 

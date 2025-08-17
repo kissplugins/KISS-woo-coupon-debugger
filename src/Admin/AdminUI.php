@@ -215,15 +215,20 @@ class AdminUI implements AdminContract {
             true
         );
 
+        $localize_data = [
+            'ajax_url'               => admin_url('admin-ajax.php'),
+            'debug_coupon_nonce'     => wp_create_nonce('wc-sc-debug-coupon-nonce'),
+            'search_customers_nonce' => wp_create_nonce('search-customers'),
+            'admin_url'              => admin_url('admin.php?page=wc-sc-debugger'),
+        ];
+
+        // Debug: Log the localized data
+        error_log('WC SC Debugger: Localizing script data: ' . print_r($localize_data, true));
+
         wp_localize_script(
             'wc-sc-debugger-admin',
             'wcSCDebugger',
-            [
-                'ajax_url'               => admin_url('admin-ajax.php'),
-                'debug_coupon_nonce'     => wp_create_nonce('wc-sc-debug-coupon-nonce'),
-                'search_customers_nonce' => wp_create_nonce('search-customers'),
-                'admin_url'              => admin_url('admin.php?page=wc-sc-debugger'),
-            ]
+            $localize_data
         );
 
         wp_enqueue_style(
@@ -370,28 +375,39 @@ class AdminUI implements AdminContract {
             'skip_smart_coupons' => false,
         ];
 
+        // Debug: Log incoming GET parameters
+        error_log('WC SC Debugger: Incoming GET parameters: ' . print_r($_GET, true));
+
         // Check for URL parameters first
         if (isset($_GET['coupon_code'])) {
             $params['coupon_code'] = sanitize_text_field(wp_unslash($_GET['coupon_code']));
+            error_log('WC SC Debugger: Found coupon_code in URL: ' . $params['coupon_code']);
         }
         if (isset($_GET['product_id'])) {
             $params['product_id'] = absint($_GET['product_id']);
+            error_log('WC SC Debugger: Found product_id in URL: ' . $params['product_id']);
         }
         if (isset($_GET['user_id'])) {
             $params['user_id'] = absint($_GET['user_id']);
+            error_log('WC SC Debugger: Found user_id in URL: ' . $params['user_id']);
         }
         if (isset($_GET['skip_smart_coupons'])) {
             $params['skip_smart_coupons'] = (bool) $_GET['skip_smart_coupons'];
+            error_log('WC SC Debugger: Found skip_smart_coupons in URL: ' . ($params['skip_smart_coupons'] ? 'true' : 'false'));
         }
 
         // If no URL parameters and we have settings repository, load last used parameters
         if (empty($params['coupon_code']) && empty($params['product_id']) && empty($params['user_id']) && $this->settings) {
+            error_log('WC SC Debugger: No URL parameters found, checking last used parameters');
             $last_used = $this->settings->getLastUsedParams();
+            error_log('WC SC Debugger: Last used parameters: ' . print_r($last_used, true));
             if (!empty($last_used)) {
                 $params = array_merge($params, $last_used);
+                error_log('WC SC Debugger: Merged parameters: ' . print_r($params, true));
             }
         }
 
+        error_log('WC SC Debugger: Final parameters: ' . print_r($params, true));
         return $params;
     }
 

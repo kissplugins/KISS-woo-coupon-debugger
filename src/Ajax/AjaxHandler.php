@@ -307,25 +307,35 @@ class AjaxHandler {
      * @return void
      */
     public function handleClearSettingsAjax(): void {
+        error_log('WC SC Debugger: Clear settings AJAX handler called');
+
         try {
+            // Debug: Log incoming POST data
+            error_log('WC SC Debugger: Clear settings POST data: ' . print_r($_POST, true));
+
             // Verify nonce
             check_ajax_referer('wc-sc-debug-coupon-nonce', 'security');
+            error_log('WC SC Debugger: Nonce verification passed');
 
             // Check permissions
             if (!current_user_can('manage_woocommerce')) {
+                error_log('WC SC Debugger: Permission check failed for user: ' . get_current_user_id());
                 wp_send_json_error([
                     'message' => __('You do not have permission to perform this action.', 'wc-sc-debugger')
                 ]);
             }
+            error_log('WC SC Debugger: Permission check passed');
 
             // Clear last used parameters
             $this->settings->clearLastUsedParams();
+            error_log('WC SC Debugger: Last used parameters cleared');
 
             wp_send_json_success([
                 'message' => __('All settings cleared successfully.', 'wc-sc-debugger')
             ]);
 
         } catch (Exception $e) {
+            error_log('WC SC Debugger: Exception in clear settings: ' . $e->getMessage());
             wp_send_json_error([
                 'message' => sprintf(
                     __('Error clearing settings: %s', 'wc-sc-debugger'),
