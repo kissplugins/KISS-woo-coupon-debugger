@@ -434,6 +434,58 @@ if ( ! class_exists( 'WC_SC_Debugger' ) ) {
 			<?php
 		}
 
+			/**
+			 * Render the self-test admin page.
+			 */
+			public function render_self_test_page() {
+				$results = array();
+
+				// Test 1: log_message() hard cap and truncation
+				$ref = new ReflectionClass( __CLASS__ );
+				$prop = $ref->getProperty( 'debug_messages' );
+				$prop->setAccessible( true );
+				$prop->setValue( array() );
+				for ( $i = 0; $i < 1005; $i++ ) {
+					self::log_message( 'info', str_repeat( 'x', 1500 ), array( 'k' => str_repeat( 'y', 11000 ) ) );
+				}
+				$messages = $prop->getValue();
+				$results['log_cap_count'] = count( $messages ) === 1000;
+				$results['log_trunc_message'] = isset( $messages[0]['message'] ) && strlen( $messages[0]['message'] ) === 1000;
+				$results['log_data_cap'] = isset( $messages[0]['data'] ) && $messages[0]['data'] === array( 'message' => 'Data too large to log' );
+
+				// Test 2: sanitize_for_logging circular and depth
+				$method = new ReflectionMethod( $this, 'sanitize_for_logging' );
+				$method->setAccessible( true );
+				$a = new stdClass();
+				$b = new stdClass();
+				$a->b = $b; $b->a = $a;
+				$stack = array();
+				$first = $method->invoke( $this, $a, 0, $stack );
+				$circular = $method->invoke( $this, $a, 1, $stack );
+				$deep = array( 'l1' => array( 'l2' => array( 'l3' => array( 'l4' => 'x' ) ) ) );
+				$stack2 = array();
+				$deep_res = $method->invoke( $this, $deep, 0, $stack2 );
+				$results['sanitize_circular'] = is_string( $circular ) && strpos( $circular, '[Circular Reference:' ) === 0;
+				$results['sanitize_depth'] = isset( $deep_res['l1']['l2']['l3'] ) && $deep_res['l1']['l2']['l3'] === '[Max Depth Reached]';
+
+				?>
+				<div class="wrap woocommerce">
+					<h1><?php echo esc_html__( 'SC Self Test', 'wc-sc-debugger' ); ?></h1>
+					<p><?php esc_html_e( 'Basic checks for internal safeguards.', 'wc-sc-debugger' ); ?></p>
+					<table class="widefat striped">
+						<thead><tr><th><?php esc_html_e( 'Test', 'wc-sc-debugger' ); ?></th><th><?php esc_html_e( 'Result', 'wc-sc-debugger' ); ?></th></tr></thead>
+						<tbody>
+							<tr><td>log_message hard cap (1000)</td><td><?php echo $results['log_cap_count'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>log_message message truncation</td><td><?php echo $results['log_trunc_message'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>log_message data size cap</td><td><?php echo $results['log_data_cap'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>sanitize_for_logging circular guard</td><td><?php echo $results['sanitize_circular'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+							<tr><td>sanitize_for_logging depth guard</td><td><?php echo $results['sanitize_depth'] ? '<span style="color:green">PASS</span>' : '<span style="color:red">FAIL</span>'; ?></td></tr>
+						</tbody>
+					</table>
+				</div>
+				<?php
+			}
+
 		/**
 		 * Handle AJAX request for debugging coupon.
 		 */
