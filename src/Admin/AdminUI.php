@@ -61,8 +61,8 @@ class AdminUI implements AdminContract {
     public function addAdminMenuPage(): void {
         add_submenu_page(
             'woocommerce',
-            __('SC Debugger', 'wc-sc-debugger'),
-            __('SC Debugger', 'wc-sc-debugger'),
+            __('KISS Coupon Debugger', 'wc-sc-debugger'),
+            __('KISS Coupon Debugger', 'wc-sc-debugger'),
             'manage_woocommerce',
             'wc-sc-debugger',
             [$this, 'renderAdminPage']
@@ -72,8 +72,8 @@ class AdminUI implements AdminContract {
     public function addSettingsPage(): void {
         add_submenu_page(
             'woocommerce',
-            __('SC Debugger Settings', 'wc-sc-debugger'),
-            __('SC Debugger Settings', 'wc-sc-debugger'),
+            __('KISS Coupon Debugger Settings', 'wc-sc-debugger'),
+            __('KISS Coupon Debugger Settings', 'wc-sc-debugger'),
             'manage_woocommerce',
             'wc-sc-debugger-settings',
             [$this, 'renderSettingsPage']
@@ -365,7 +365,7 @@ class AdminUI implements AdminContract {
                             }
                             ?>
                         </select>
-                        <p class="description"><?php esc_html_e('Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger'); ?><a href="<?php echo esc_url(admin_url('admin.php?page=wc-sc-debugger-settings')); ?>"><?php esc_html_e('SC Debugger Settings', 'wc-sc-debugger'); ?></a> <?php esc_html_e('page.', 'wc-sc-debugger'); ?></p>
+                        <p class="description"><?php esc_html_e('Choose a pre-defined product to test coupon compatibility. Define products in the ', 'wc-sc-debugger'); ?><a href="<?php echo esc_url(admin_url('admin.php?page=wc-sc-debugger-settings')); ?>"><?php esc_html_e('KISS Coupon Debugger Settings', 'wc-sc-debugger'); ?></a> <?php esc_html_e('page.', 'wc-sc-debugger'); ?></p>
                     </div>
 
                     <div class="form-field">
