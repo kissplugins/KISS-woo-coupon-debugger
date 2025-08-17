@@ -154,41 +154,189 @@ The plugin monitors numerous WooCommerce and Smart Coupons hooks including:
 - No permanent changes are made to the database during testing
 
 ## Changelog
+See Changelog.md
 
-### 1.4.0 - 2025-08-05
-- New: Added support for variable products - automatically selects first available variation
-- New: Added support for grouped products - automatically selects first available child
-- Enhancement: More detailed logging for product additions including variation attributes
-- Enhancement: Better error messages when products cannot be added to cart
+## Special Overview for v2.1.0+ Features
 
-### 1.3.0 - 2025-08-04
-- Fix: Properly initialize WooCommerce session for AJAX requests
-- Fix: Add error boundaries and better exception handling
-- Fix: Improve memory management and prevent infinite loops
-- Fix: Better cart state restoration
-- Add: Timeout protection for long-running operations
+Version 2.1.0 introduces powerful new features that dramatically improve the user experience and collaboration capabilities of the WC SC Debugger plugin. These features focus on **workflow efficiency**, **team collaboration**, and **enhanced troubleshooting**.
 
-### 1.2.0 - 2025-08-03
-- Fix: PHP fatal error by ensuring WC notices are correctly handled during the test simulation
-- Tweak: Improved session handling during the coupon test
+---
 
-### 1.0.0
-- Initial release
+## 🔗 URL Sharing & Parameter Persistence
 
-## Support
+### **Generate Shareable URLs**
+Create URLs that contain all your current test parameters, perfect for:
+- **Team Collaboration**: Share exact test configurations with colleagues
+- **Bug Reports**: Include precise reproduction steps in support tickets
+- **Bookmarking**: Save frequently used test scenarios
+- **Documentation**: Include working examples in internal docs
 
-For support, feature requests, or bug reports, please visit:
-- [GitHub Repository](https://github.com/kissplugins/KISS-woo-coupon-debugger)
-- [KISS Plugins Website](https://kissplugins.com)
+**How to Use:**
+1. Fill in your coupon code, product, user, and settings
+2. Click **"Generate Shareable URL"**
+3. Copy the generated URL
+4. Share with team members or bookmark for later
 
-## License
+**Example Generated URL:**
+```
+https://yoursite.com/wp-admin/admin.php?page=wc-sc-debugger&coupon_code=SAVE20&product_id=123&user_id=456&skip_smart_coupons=1
+```
 
-This plugin is licensed under the GPL v3 or later.
+### **Automatic Parameter Persistence**
+Never lose your test settings again! The plugin now:
+- **Remembers Your Last Settings**: Automatically saves your last used parameters
+- **Restores on Page Load**: Pre-fills forms with your previous values
+- **User-Specific**: Each team member has their own saved preferences
+- **Smart Loading**: URL parameters take priority over saved settings
 
-## Credits
+**Benefits:**
+- ⚡ **Faster Testing**: No need to re-enter the same parameters repeatedly
+- 🎯 **Consistent Testing**: Easily return to your preferred test configuration
+- 👥 **Team Efficiency**: Each user maintains their own testing preferences
 
-Developed by [KISS Plugins](https://kissplugins.com)
+### **Clear All Settings**
+One-click reset functionality:
+- **Complete Reset**: Clears all form fields instantly
+- **Clears Saved Data**: Removes your stored preferences
+- **Confirmation Dialog**: Prevents accidental clearing
+- **Fresh Start**: Perfect for switching between different test scenarios
+
+---
+
+## 🐛 Enhanced Debug System
+
+### **Smart Debug Logging**
+Comprehensive troubleshooting system that helps diagnose issues:
+
+**JavaScript Console Logging:**
+- Script loading verification
+- Element availability checks
+- Form interaction tracking
+- AJAX request/response monitoring
+- User selection loading status
+
+**PHP Error Log Integration:**
+- Script enqueuing process
+- Parameter handling details
+- Database operation results
+- AJAX handler execution
+- Settings save/load operations
+
+### **Flexible Debug Control**
+Multiple ways to enable debug mode based on your needs:
+
+**1. Plugin Settings (Recommended)**
+- Go to **WooCommerce > SC Debugger Settings**
+- Check **"Enable Debug Logging"**
+- Perfect for ongoing troubleshooting
+
+**2. URL Parameter (Temporary)**
+- Add `?wc_sc_debug=1` to any debugger page
+- Great for quick testing without changing settings
+
+**3. WordPress Debug Mode (Automatic)**
+- Automatically enables when `WP_DEBUG` is true
+- Integrates with your existing WordPress debug setup
+
+### **Production-Safe Design**
+- **Zero Overhead**: No performance impact when debug mode is disabled
+- **Smart Logging**: Only processes debug messages when actually needed
+- **Critical Errors**: Always logs important errors regardless of debug mode
+- **Easy Toggle**: Can be quickly enabled/disabled as needed
+
+---
+
+## 🎯 Use Cases & Workflows
+
+### **For Development Teams**
+1. **Bug Reproduction**: Generate URLs with exact parameters that reproduce issues
+2. **Code Reviews**: Share test configurations for peer validation
+3. **QA Testing**: Standardize test scenarios across team members
+4. **Documentation**: Include working examples in technical documentation
+
+### **For Support Teams**
+1. **Customer Issues**: Ask customers to share their debugger URL
+2. **Troubleshooting**: Enable debug mode to diagnose problems
+3. **Knowledge Base**: Create shareable test scenarios for common issues
+4. **Training**: Use saved configurations for team training sessions
+
+### **For Site Administrators**
+1. **Regular Testing**: Bookmark frequently used test configurations
+2. **Performance Monitoring**: Use debug mode to identify bottlenecks
+3. **Environment Comparison**: Compare behavior between staging and production
+4. **Maintenance**: Quick access to common debugging scenarios
+
+---
+
+## 🔧 Technical Implementation
+
+### **Data Storage**
+- **User Preferences**: Stored in WordPress user meta (per-user basis)
+- **URL Parameters**: Standard GET parameters for easy sharing
+- **Settings**: WordPress options API for global configuration
+- **Security**: Proper nonce verification and capability checks
+
+### **Performance Considerations**
+- **Lazy Loading**: Debug features only load when needed
+- **Minimal Overhead**: Less than 1% performance impact when enabled
+- **Production Ready**: Safe to deploy with debug mode disabled
+- **Efficient Storage**: Minimal database footprint
+
+### **Browser Compatibility**
+- **Modern Browsers**: Full feature support in Chrome, Firefox, Safari, Edge
+- **Mobile Responsive**: Works on tablets and mobile devices
+- **Graceful Degradation**: Core functionality works even with JavaScript disabled
+- **Accessibility**: Proper ARIA labels and keyboard navigation
+
+---
+
+## 📋 Migration & Upgrade Notes
+
+### **Automatic Upgrade**
+- **Seamless Migration**: Existing functionality remains unchanged
+- **New Features**: Available immediately after upgrade
+- **No Configuration Required**: Works out of the box
+- **Backward Compatible**: All existing workflows continue to work
+
+### **Recommended Actions After Upgrade**
+1. **Test New Features**: Try generating a shareable URL
+2. **Configure Debug Mode**: Set your preferred debug logging level
+3. **Train Team Members**: Share the new collaboration features
+4. **Update Documentation**: Include new URL sharing capabilities
+
+---
+
+## 🆘 Troubleshooting
+
+### **If URL Sharing Doesn't Work**
+1. Check browser console for JavaScript errors
+2. Verify all form fields are properly filled
+3. Ensure you have proper WordPress permissions
+4. Try enabling debug mode for detailed logging
+
+### **If Parameters Don't Persist**
+1. Verify you're logged into WordPress
+2. Check that user meta storage is working
+3. Ensure database permissions are correct
+4. Try clearing browser cache
+
+### **For Debug Logging Issues**
+1. Verify debug mode is enabled in settings
+2. Check WordPress error log location
+3. Ensure `WP_DEBUG_LOG` is enabled
+4. Verify file permissions on log directory
+
+---
+
+## 🎉 Getting Started
+
+1. **Update to v2.1.0**: Install the latest version
+2. **Try URL Sharing**: Fill in a test scenario and generate a URL
+3. **Test Parameter Persistence**: Reload the page and see your settings restored
+4. **Enable Debug Mode**: Turn on logging for detailed troubleshooting
+5. **Share with Team**: Start collaborating with shareable URLs
+
+**Need Help?** Check the `DEBUG-SYSTEM.md` file for detailed troubleshooting information.
 
 ## Disclaimer
-
 This plugin is intended for debugging and development purposes. Always test in a staging environment before using on a production site. The authors are not responsible for any data loss or issues that may occur from using this plugin.

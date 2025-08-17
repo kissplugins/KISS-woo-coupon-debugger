@@ -35,7 +35,7 @@ class AdminUI implements AdminContract {
      * @param string $version Plugin version
      * @param SettingsRepositoryInterface $settings Settings repository
      */
-    public function __construct(string $version = '1.3.0', SettingsRepositoryInterface $settings = null) {
+    public function __construct(string $version = '2.1.0', SettingsRepositoryInterface $settings = null) {
         $this->version = $version;
         $this->settings = $settings;
     }
@@ -93,6 +93,12 @@ class AdminUI implements AdminContract {
             function($val){ return (int) (bool) $val; }
         );
 
+        register_setting(
+            'wc_sc_debugger_options_group',
+            'wc_sc_debugger_debug_mode',
+            function($val){ return (int) (bool) $val; }
+        );
+
         add_settings_section(
             'wc_sc_debugger_products_section',
             __('Pre-define Products for Testing', 'wc-sc-debugger'),
@@ -114,6 +120,15 @@ class AdminUI implements AdminContract {
             'wc-sc-debugger-settings',
             'wc_sc_debugger_behavior_section',
             [ 'label_for' => 'wc_sc_debugger_skip_smart_coupons' ]
+        );
+
+        add_settings_field(
+            'wc_sc_debugger_debug_mode',
+            __('Enable Debug Logging', 'wc-sc-debugger'),
+            [$this, 'debugModeFieldCallback'],
+            'wc-sc-debugger-settings',
+            'wc_sc_debugger_behavior_section',
+            [ 'label_for' => 'wc_sc_debugger_debug_mode' ]
         );
 
         for ($i = 1; $i <= 3; $i++) {
@@ -193,6 +208,11 @@ class AdminUI implements AdminContract {
     }
 
     public function enqueueAdminScripts(string $hook): void {
+        // Debug: Log script enqueue attempt
+        if ($this->isDebugMode()) {
+            error_log('WC SC Debugger: enqueueAdminScripts called with hook: ' . $hook);
+        }
+
         // Enqueue changelog scripts on plugins page
         global $pagenow;
         if ('plugins.php' === $pagenow) {
@@ -201,29 +221,45 @@ class AdminUI implements AdminContract {
         }
 
         if ('woocommerce_page_wc-sc-debugger' !== $hook && 'woocommerce_page_wc-sc-debugger-settings' !== $hook) {
+            if ($this->isDebugMode()) {
+                error_log('WC SC Debugger: Hook does not match our pages: ' . $hook);
+            }
             return;
+        }
+
+        if ($this->isDebugMode()) {
+            error_log('WC SC Debugger: Proceeding to enqueue scripts for hook: ' . $hook);
         }
 
         wp_enqueue_script('selectWoo');
         wp_enqueue_style('select2');
 
+        $script_url = plugins_url('assets/js/admin.js', WC_SC_DEBUGGER_PLUGIN_FILE);
+        error_log('WC SC Debugger: Enqueuing script from URL: ' . $script_url);
+        error_log('WC SC Debugger: Script version: ' . $this->version);
+
         wp_enqueue_script(
             'wc-sc-debugger-admin',
-            plugins_url('assets/js/admin.js', WC_SC_DEBUGGER_PLUGIN_FILE),
+            $script_url,
             ['jquery', 'selectWoo'],
             $this->version,
             true
         );
+
+        error_log('WC SC Debugger: Script enqueued successfully');
 
         $localize_data = [
             'ajax_url'               => admin_url('admin-ajax.php'),
             'debug_coupon_nonce'     => wp_create_nonce('wc-sc-debug-coupon-nonce'),
             'search_customers_nonce' => wp_create_nonce('search-customers'),
             'admin_url'              => admin_url('admin.php?page=wc-sc-debugger'),
+            'debug_mode'             => $this->isDebugMode(),
         ];
 
-        // Debug: Log the localized data
-        error_log('WC SC Debugger: Localizing script data: ' . print_r($localize_data, true));
+        // Debug: Log the localized data (only if debug mode is on)
+        if ($this->isDebugMode()) {
+            error_log('WC SC Debugger: Localizing script data: ' . print_r($localize_data, true));
+        }
 
         wp_localize_script(
             'wc-sc-debugger-admin',
@@ -271,12 +307,15 @@ class AdminUI implements AdminContract {
     }
 
     public function renderAdminPage(): void {
+        error_log('WC SC Debugger: renderAdminPage called');
+
         $validated_products = get_option('wc_sc_debugger_validated_products', []);
 
         // Get parameters from URL or last used parameters
         $params = $this->getPageParameters();
 
         ?>
+        <!-- WC SC Debugger: Page rendered at <?php echo esc_html(current_time('Y-m-d H:i:s')); ?> with params: <?php echo esc_html(print_r($params, true)); ?> -->
         <div class="wrap woocommerce">
             <h1><?php esc_html_e('WooCommerce Smart Coupons Debugger', 'wc-sc-debugger'); ?></h1>
 
@@ -411,6 +450,32 @@ class AdminUI implements AdminContract {
         return $params;
     }
 
+    /**
+     * Check if debug mode is enabled
+     *
+     * @return bool
+     */
+    private function isDebugMode(): bool {
+        // Enable debug mode if:
+        // 1. Plugin setting is enabled, OR
+        // 2. WP_DEBUG is true, OR
+        // 3. URL parameter ?wc_sc_debug=1 is present
+
+        if (get_option('wc_sc_debugger_debug_mode', 0)) {
+            return true;
+        }
+
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            return true;
+        }
+
+        if (isset($_GET['wc_sc_debug']) && $_GET['wc_sc_debug'] == '1') {
+            return true;
+        }
+
+        return false;
+    }
+
     public function renderSettingsPage(): void {
         ?>
         <div class="wrap woocommerce">
@@ -478,6 +543,11 @@ class AdminUI implements AdminContract {
     public function skipSmartCouponsFieldCallback(): void {
         $val = (int) get_option('wc_sc_debugger_skip_smart_coupons', 0);
         echo '<label><input type="checkbox" id="wc_sc_debugger_skip_smart_coupons" name="wc_sc_debugger_skip_smart_coupons" value="1" ' . checked(1, $val, false) . ' /> ' . esc_html__('If Smart Coupons throws PHP 8+ errors, skip its stack and simulate discount heuristically.', 'wc-sc-debugger') . '</label>';
+    }
+
+    public function debugModeFieldCallback(): void {
+        $value = get_option('wc_sc_debugger_debug_mode', 0);
+        echo '<label><input type="checkbox" id="wc_sc_debugger_debug_mode" name="wc_sc_debugger_debug_mode" value="1" ' . checked(1, $value, false) . ' /> ' . esc_html__('Enable detailed logging for troubleshooting. Logs will appear in browser console and WordPress error log. Disable in production for better performance.', 'wc-sc-debugger') . '</label>';
     }
 
 }
