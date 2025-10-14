@@ -10,7 +10,7 @@
  * License URI: http://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: wc-sc-debugger
  * Domain Path: /languages
- * Requires PHP: 7.4
+ * Requires PHP: 8.0
  * Requires at least: 5.0
  * Tested up to: 6.3
  * WC requires at least: 4.0
