@@ -14,8 +14,8 @@
   <!-- Use WordPress ruleset -->
   <rule ref="WordPress" />
 
-  <!-- PHP version compatibility (PHP 7.4+) -->
-  <config name="testVersion" value="7.4-" />
+  <!-- PHP version compatibility (PHP 8.0+) -->
+  <config name="testVersion" value="8.0-" />
 
   <!-- CLI arguments -->
   <arg name="colors" />

@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "php": ">=7.4"
+        "php": ">=8.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.0",
@@ -33,9 +33,19 @@
     },
     "scripts": {
         "test": "phpunit",
-        "phpstan": "phpstan analyse src --level=8",
-        "phpcs": "phpcs src --standard=WordPress",
-        "phpmd": "phpmd src text cleancode,codesize,controversial,design,naming,unusedcode"
+        "phpstan": "phpstan analyse src kiss-coupon-debugger.php --level=8 --configuration=phpstan.neon",
+        "phpcs": "phpcs --standard=phpcs.xml.dist",
+        "phpcbf": "phpcbf --standard=phpcs.xml.dist",
+        "phpcs-summary": "phpcs --standard=phpcs.xml.dist --report=summary",
+        "php-compat": "phpcs --standard=PHPCompatibility --runtime-set testVersion 8.0- src/ kiss-coupon-debugger.php",
+        "lint": "find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' | xargs php -l",
+        "phpmd": "phpmd src text cleancode,codesize,controversial,design,naming,unusedcode",
+        "test-all": [
+            "@lint",
+            "@phpcs",
+            "@php-compat",
+            "@phpstan"
+        ]
     },
     "config": {
         "sort-packages": true,

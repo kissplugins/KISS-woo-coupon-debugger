@@ -1,0 +1,77 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - kiss-coupon-debugger.php
+    
+    # Ignore WordPress globals and functions
+    bootstrapFiles:
+        - vendor/autoload.php
+    
+    # WordPress specific ignores
+    ignoreErrors:
+        # WordPress functions that PHPStan doesn't know about
+        - '#Function wp_[a-zA-Z_]+ not found#'
+        - '#Function get_[a-zA-Z_]+ not found#'
+        - '#Function add_[a-zA-Z_]+ not found#'
+        - '#Function register_[a-zA-Z_]+ not found#'
+        - '#Function current_[a-zA-Z_]+ not found#'
+        - '#Function is_[a-zA-Z_]+ not found#'
+        - '#Function esc_[a-zA-Z_]+ not found#'
+        - '#Function sanitize_[a-zA-Z_]+ not found#'
+        - '#Function checked not found#'
+        - '#Function selected not found#'
+        - '#Function submit_button not found#'
+        - '#Function settings_fields not found#'
+        - '#Function do_settings_sections not found#'
+        - '#Function wp_send_json_[a-zA-Z_]+ not found#'
+        - '#Function wp_verify_nonce not found#'
+        - '#Function wp_create_nonce not found#'
+        - '#Function wp_localize_script not found#'
+        - '#Function wp_enqueue_[a-zA-Z_]+ not found#'
+        - '#Function wp_register_[a-zA-Z_]+ not found#'
+        - '#Function plugin_[a-zA-Z_]+ not found#'
+        - '#Function admin_url not found#'
+        - '#Function home_url not found#'
+        - '#Function site_url not found#'
+        - '#Function absint not found#'
+        - '#Function wp_kses_post not found#'
+        - '#Function wp_strip_all_tags not found#'
+        
+        # WordPress constants
+        - '#Constant ABSPATH not found#'
+        - '#Constant WP_DEBUG not found#'
+        - '#Constant WPINC not found#'
+        
+        # WooCommerce functions
+        - '#Function wc_[a-zA-Z_]+ not found#'
+        - '#Function WC not found#'
+        
+        # WordPress globals
+        - '#Variable \$wpdb might not be defined#'
+        - '#Variable \$wp_query might not be defined#'
+        - '#Variable \$post might not be defined#'
+        
+        # WordPress hooks - these are dynamic and can't be statically analyzed
+        - '#Call to undefined method [a-zA-Z\\\\]+::[a-zA-Z_]+\(\) on an unknown class [a-zA-Z\\\\]+#'
+        
+    # Exclude vendor and test files
+    excludePaths:
+        - vendor/*
+        - tests/*
+        - node_modules/*
+    
+    # Check for missing return types
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    
+    # WordPress specific settings
+    universalObjectCratesClasses:
+        - stdClass
+        - WP_Error
+        - WP_Query
+        - WP_User
+        - WC_Product
+        - WC_Coupon
+        - WC_Cart
+        - WC_Customer
